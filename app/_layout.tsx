@@ -1,24 +1,58 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import { AppProvider, useApp } from '../store/AppContext';
+import { View } from 'react-native';
+import { Colors } from '../theme';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+// Wrapper component to handle routing logic based on state
+const RootNavigation = () => {
+  const { user, isDark } = useApp();
+  const segments = useSegments();
+  const router = useRouter();
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+  useEffect(() => {
+    // Basic navigation guard logic for demo purposes
+    // In a real app we'd wait for splash screen to hide, auth state to resolve, etc.
+    const inAuthGroup = segments[0] === '(auth)';
+    const inTabsGroup = segments[0] === '(tabs)';
+    
+    // We let the splash screen (index.tsx) or onboarding handle the initial flow, 
+    // but if the user state changes we force navigation.
+    if (user && inAuthGroup) {
+      router.replace('/(tabs)');
+    } else if (!user && inTabsGroup) {
+      router.replace('/(auth)/login');
+    }
+  }, [user, segments]);
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const backgroundColor = isDark ? Colors.dark.background : Colors.light.background;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <View style={{ flex: 1, backgroundColor }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="venue/[id]" />
+        <Stack.Screen name="booking/date" />
+        <Stack.Screen name="booking/slot" />
+        <Stack.Screen name="booking/summary" />
+        <Stack.Screen name="booking/success" />
+        <Stack.Screen name="search" />
+        <Stack.Screen name="settings" />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AppProvider>
+      <RootNavigation />
+    </AppProvider>
   );
 }
