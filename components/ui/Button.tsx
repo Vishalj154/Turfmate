@@ -97,7 +97,7 @@ export const Button: React.FC<ButtonProps> = ({
           {leftIcon && <React.Fragment>{leftIcon}</React.Fragment>}
           <Text 
             variant="button" 
-            style={[styles.text, variantStyles.text, (leftIcon || rightIcon) && { marginHorizontal: Spacing.sm }]}
+            style={[styles.text, variantStyles.text, (leftIcon || rightIcon) ? { marginHorizontal: Spacing.sm } : undefined]}
           >
             {title}
           </Text>

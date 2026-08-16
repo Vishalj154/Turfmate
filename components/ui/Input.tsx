@@ -4,18 +4,21 @@ import {
   TextInputProps, 
   View, 
   StyleSheet, 
-  TouchableOpacity 
+  TouchableOpacity,
+  StyleProp,
+  ViewStyle
 } from 'react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Text } from './Text';
 import { Ionicons } from '@expo/vector-icons';
 
-export interface InputProps extends TextInputProps {
+export interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
   error?: string;
   leftIcon?: keyof typeof Ionicons.glyphMap;
   isPassword?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 export const Input: React.FC<InputProps> = ({

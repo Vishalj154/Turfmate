@@ -53,7 +53,7 @@ export default function LoginScreen() {
             />
             
             <View style={styles.forgotPassword}>
-              <Link href="/(auth)/forgot-password" asChild>
+              <Link href={"/(auth)/forgot-password" as any} asChild>
                 <Text variant="button" color={themeColors.primary}>Forgot Password?</Text>
               </Link>
             </View>
