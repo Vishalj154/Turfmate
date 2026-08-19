@@ -13,9 +13,8 @@ export default function ProfileScreen() {
   const themeColors = isDark ? Colors.dark : Colors.light;
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
-    router.replace('/(auth)/login');
+  const handleLogout = async () => {
+    await logout();
   };
 
   const MenuItem = ({ icon, title, value, onPress, hasSwitch, switchValue, onSwitch }: any) => (

@@ -72,8 +72,7 @@ export default function RegisterScreen() {
         rewardPoints: 0,
         walletBalance: 0
       });
-      
-      login(false);
+      // Auth state listener in AppContext will catch auth state change & navigate
     } catch (err: unknown) {
       console.error('Firebase Auth Error:', err);
       setError(getFirebaseAuthErrorMessage(err));

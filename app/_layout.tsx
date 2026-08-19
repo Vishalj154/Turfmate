@@ -3,31 +3,44 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { AppProvider, useApp } from '../store/AppContext';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { Colors } from '../theme';
 
 // Wrapper component to handle routing logic based on state
 const RootNavigation = () => {
-  const { user, isDark } = useApp();
+  const { user, authLoading, isDark } = useApp();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    // Basic navigation guard logic for demo purposes
-    // In a real app we'd wait for splash screen to hide, auth state to resolve, etc.
-    const inAuthGroup = segments[0] === '(auth)';
-    const inTabsGroup = segments[0] === '(tabs)';
-    
-    // We let the splash screen (index.tsx) or onboarding handle the initial flow, 
-    // but if the user state changes we force navigation.
-    if (user && inAuthGroup) {
-      router.replace('/(tabs)');
-    } else if (!user && inTabsGroup) {
-      router.replace('/(auth)/login');
+    if (authLoading) return;
+
+    const firstSegment = segments[0] as string | undefined;
+    const inAuthGroup = firstSegment === '(auth)';
+    const inTabsGroup = firstSegment === '(tabs)';
+    const isInitialRoute = !firstSegment || firstSegment === 'index' || firstSegment === 'onboarding';
+
+    if (user) {
+      if (inAuthGroup || isInitialRoute) {
+        router.replace('/(tabs)');
+      }
+    } else {
+      if (inTabsGroup) {
+        router.replace('/(auth)/login');
+      }
     }
-  }, [user, segments]);
+  }, [user, authLoading, segments]);
 
   const backgroundColor = isDark ? Colors.dark.background : Colors.light.background;
+  const primaryColor = isDark ? Colors.dark.primary : Colors.light.primary;
+
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={primaryColor} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor }}>

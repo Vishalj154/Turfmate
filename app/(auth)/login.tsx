@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
@@ -8,14 +8,44 @@ import { Button } from '../../components/ui/Button';
 import { Colors, Spacing } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
+import { loginUser } from '../../services/authService';
+import { getFirebaseAuthErrorMessage } from '../../services/firebaseErrors';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login, isDark } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
 
-  const handleLogin = () => {
-    login(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    setError('');
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!trimmedEmail.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await loginUser(trimmedEmail, password);
+      // Navigation is automatically triggered by onAuthStateChanged in AppContext
+    } catch (err: unknown) {
+      setError(getFirebaseAuthErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGuestLogin = () => {
@@ -38,18 +68,30 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.form}>
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Text variant="body" color={themeColors.error}>{error}</Text>
+              </View>
+            ) : null}
+
             <Input 
               label="Email Address"
               placeholder="Enter your email"
               leftIcon="mail-outline"
               keyboardType="email-address"
               autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              editable={!loading}
             />
             <Input 
               label="Password"
               placeholder="Enter your password"
               leftIcon="lock-closed-outline"
               isPassword
+              value={password}
+              onChangeText={setPassword}
+              editable={!loading}
             />
             
             <View style={styles.forgotPassword}>
@@ -62,6 +104,8 @@ export default function LoginScreen() {
               title="Login" 
               onPress={handleLogin} 
               style={styles.loginButton}
+              loading={loading}
+              disabled={loading}
             />
 
             <View style={styles.divider}>
@@ -75,6 +119,7 @@ export default function LoginScreen() {
               variant="outline"
               onPress={handleGuestLogin} 
               style={styles.guestButton}
+              disabled={loading}
             />
 
             <View style={styles.registerContainer}>
@@ -113,6 +158,12 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  errorContainer: {
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    backgroundColor: 'rgba(255,0,0,0.1)',
+    borderRadius: 8,
   },
   forgotPassword: {
     alignItems: 'flex-end',
