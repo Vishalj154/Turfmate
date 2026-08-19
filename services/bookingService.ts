@@ -1,0 +1,212 @@
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  runTransaction,
+  serverTimestamp
+} from 'firebase/firestore';
+import { db } from './firebase';
+import { Booking as SchemaBooking } from '../database/schema';
+import { Booking as UIBooking } from '../types';
+
+export interface CreateBookingParams {
+  userId: string;
+  venueId: string;
+  date: string; // e.g. "2026-08-20" or "12 Oct 2026"
+  startTime: string; // e.g. "18:00" or "06:00 AM"
+  endTime: string;   // e.g. "19:00" or "07:00 AM"
+  timeSlotString: string; // e.g. "06:00 AM - 07:00 AM"
+  players?: number;
+  amount: number;
+  couponId?: string | null;
+}
+
+// Generate a deterministic timeSlot document ID for atomic transaction locking
+export const getSlotDocId = (venueId: string, date: string, startTime: string): string => {
+  const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '_');
+  const cleanTime = startTime.replace(/[^a-zA-Z0-9]/g, '_');
+  return `${venueId}_${cleanDate}_${cleanTime}`;
+};
+
+/**
+ * Atomic Booking Creation using Firestore runTransaction.
+ * Prevents race conditions and double-booking.
+ */
+export const createBookingAtomic = async (params: CreateBookingParams): Promise<UIBooking> => {
+  const slotDocId = getSlotDocId(params.venueId, params.date, params.startTime);
+  const slotRef = doc(db, 'timeSlots', slotDocId);
+  const bookingRef = doc(collection(db, 'bookings'));
+  const newBookingId = bookingRef.id;
+
+  await runTransaction(db, async (transaction) => {
+    // Read the timeSlot document atomically inside transaction
+    const slotSnap = await transaction.get(slotRef);
+
+    if (slotSnap.exists() && slotSnap.data().status === 'booked') {
+      throw new Error('THIS_SLOT_IS_ALREADY_BOOKED');
+    }
+
+    // Set timeSlot document reservation
+    transaction.set(slotRef, {
+      id: slotDocId,
+      venueId: params.venueId,
+      date: params.date,
+      startTime: params.startTime,
+      endTime: params.endTime,
+      status: 'booked',
+      bookingId: newBookingId
+    });
+
+    // Set booking document in Firestore
+    transaction.set(bookingRef, {
+      id: newBookingId,
+      userId: params.userId,
+      venueId: params.venueId,
+      date: params.date,
+      startTime: params.startTime,
+      endTime: params.endTime,
+      timeSlot: params.timeSlotString,
+      players: params.players || 10,
+      amount: params.amount,
+      paymentStatus: 'paid',
+      bookingStatus: 'confirmed',
+      couponId: params.couponId || null,
+      createdAt: serverTimestamp()
+    });
+  });
+
+  return {
+    id: newBookingId,
+    venueId: params.venueId,
+    date: params.date,
+    timeSlot: params.timeSlotString,
+    amount: params.amount,
+    status: 'Upcoming'
+  };
+};
+
+/**
+ * Query booked slot IDs/timeStrings for a given venue and date.
+ */
+export const getBookedSlotsForVenueAndDate = async (venueId: string, date: string): Promise<string[]> => {
+  try {
+    const timeSlotsRef = collection(db, 'timeSlots');
+    const q = query(
+      timeSlotsRef,
+      where('venueId', '==', venueId),
+      where('date', '==', date),
+      where('status', '==', 'booked')
+    );
+    const snapshot = await getDocs(q);
+
+    const bookedTimes: string[] = [];
+    snapshot.forEach((dSnap) => {
+      const data = dSnap.data();
+      if (data.startTime) {
+        bookedTimes.push(data.startTime);
+      }
+    });
+
+    // Also check bookings collection as fallback
+    const bookingsRef = collection(db, 'bookings');
+    const qBookings = query(
+      bookingsRef,
+      where('venueId', '==', venueId),
+      where('date', '==', date),
+      where('bookingStatus', 'in', ['pending', 'confirmed'])
+    );
+    const bookingSnapshot = await getDocs(qBookings);
+    bookingSnapshot.forEach((bSnap) => {
+      const bData = bSnap.data();
+      if (bData.startTime && !bookedTimes.includes(bData.startTime)) {
+        bookedTimes.push(bData.startTime);
+      }
+    });
+
+    return bookedTimes;
+  } catch (error) {
+    console.error('Error fetching booked slots:', error);
+    return [];
+  }
+};
+
+/**
+ * Fetch all bookings for an authenticated user.
+ */
+export const getUserBookingsFromFirestore = async (userId: string): Promise<UIBooking[]> => {
+  try {
+    const bookingsRef = collection(db, 'bookings');
+    const q = query(bookingsRef, where('userId', '==', userId));
+    const snapshot = await getDocs(q);
+
+    const userBookings: UIBooking[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      
+      let uiStatus: 'Upcoming' | 'Completed' | 'Cancelled' = 'Upcoming';
+      if (data.bookingStatus === 'cancelled') {
+        uiStatus = 'Cancelled';
+      } else if (data.bookingStatus === 'completed') {
+        uiStatus = 'Completed';
+      } else {
+        uiStatus = 'Upcoming';
+      }
+
+      userBookings.push({
+        id: docSnap.id,
+        venueId: data.venueId,
+        date: data.date,
+        timeSlot: data.timeSlot || `${data.startTime || ''} - ${data.endTime || ''}`,
+        amount: data.amount || 0,
+        status: uiStatus
+      });
+    });
+
+    return userBookings;
+  } catch (error) {
+    console.error('Error fetching user bookings:', error);
+    return [];
+  }
+};
+
+/**
+ * Cancel a booking for an authenticated user.
+ */
+export const cancelBookingInFirestore = async (bookingId: string, userId: string): Promise<boolean> => {
+  try {
+    const bookingRef = doc(db, 'bookings', bookingId);
+    const bookingSnap = await getDoc(bookingRef);
+
+    if (!bookingSnap.exists()) {
+      throw new Error('Booking not found');
+    }
+
+    const data = bookingSnap.data();
+    if (data.userId !== userId) {
+      throw new Error('Unauthorized cancellation attempt');
+    }
+
+    await runTransaction(db, async (transaction) => {
+      transaction.update(bookingRef, {
+        bookingStatus: 'cancelled'
+      });
+
+      if (data.venueId && data.date && data.startTime) {
+        const slotDocId = getSlotDocId(data.venueId, data.date, data.startTime);
+        const slotRef = doc(db, 'timeSlots', slotDocId);
+        transaction.update(slotRef, {
+          status: 'available',
+          bookingId: null
+        });
+      }
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error cancelling booking:', error);
+    throw error;
+  }
+};

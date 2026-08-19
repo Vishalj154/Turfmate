@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
@@ -7,7 +7,8 @@ import { Button } from '../../components/ui/Button';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_VENUES } from '../../data/mockData';
+import { getTurfByIdFromFirestore } from '../../services/turfService';
+import { Venue as UIVenue } from '../../types';
 
 const { width } = Dimensions.get('window');
 
@@ -17,12 +18,32 @@ export default function VenueDetailsScreen() {
   const { isDark, isFavorite, toggleFavorite } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
 
-  const venue = MOCK_VENUES.find(v => v.id === id);
+  const [venue, setVenue] = useState<UIVenue | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (id && typeof id === 'string') {
+      getTurfByIdFromFirestore(id)
+        .then((data) => setVenue(data))
+        .catch((err) => console.error(err))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.background }}>
+        <ActivityIndicator size="large" color={themeColors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   if (!venue) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Venue not found</Text>
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.background }}>
+        <Text variant="h2" style={{ marginBottom: Spacing.md }}>Venue Not Found</Text>
         <Button title="Go Back" onPress={() => router.back()} />
       </SafeAreaView>
     );

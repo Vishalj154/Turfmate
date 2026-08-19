@@ -24,6 +24,7 @@ interface AppContextType {
   
   bookings: Booking[];
   addBooking: (booking: Booking) => void;
+  refreshBookings: () => Promise<void>;
   
   notifications: Notification[];
   markNotificationRead: (id: string) => void;
@@ -36,35 +37,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [favorites, setFavorites] = useState<string[]>(['v1', 'v3']); // some mock favorites
+  const [favorites, setFavorites] = useState<string[]>(['venue_001']);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
 
   const isDark = themeMode === 'system' ? systemColorScheme === 'dark' : themeMode === 'dark';
+
+  const refreshBookings = async () => {
+    if (user && user.id && user.id !== 'guest') {
+      try {
+        const { getUserBookingsFromFirestore } = await import('../services/bookingService');
+        const userBkgs = await getUserBookingsFromFirestore(user.id);
+        setBookings(userBkgs);
+      } catch (err) {
+        console.error('Error in refreshBookings:', err);
+      }
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (fbUser) => {
       if (fbUser) {
         try {
           const profile = await getUserProfile(fbUser.uid);
-          if (profile) {
-            setUser({
-              id: profile.id || fbUser.uid,
-              name: profile.name || fbUser.displayName || 'TurfMate User',
-              email: profile.email || fbUser.email || '',
-              phone: profile.phone || fbUser.phoneNumber || '',
-              isVerified: fbUser.emailVerified || false,
-              points: profile.rewardPoints ?? 0,
-            });
-          } else {
-            setUser({
-              id: fbUser.uid,
-              name: fbUser.displayName || 'TurfMate User',
-              email: fbUser.email || '',
-              phone: fbUser.phoneNumber || '',
-              isVerified: fbUser.emailVerified || false,
-              points: 0,
-            });
+          const u: User = {
+            id: profile?.id || fbUser.uid,
+            name: profile?.name || fbUser.displayName || 'TurfMate User',
+            email: profile?.email || fbUser.email || '',
+            phone: profile?.phone || fbUser.phoneNumber || '',
+            isVerified: fbUser.emailVerified || false,
+            points: profile?.rewardPoints ?? 0,
+          };
+          setUser(u);
+
+          // Fetch user's bookings from Firestore
+          try {
+            const { getUserBookingsFromFirestore } = await import('../services/bookingService');
+            const userBkgs = await getUserBookingsFromFirestore(u.id);
+            setBookings(userBkgs);
+          } catch (e) {
+            console.error('Error fetching initial user bookings:', e);
           }
         } catch {
           setUser({
@@ -78,6 +90,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         setUser(null);
+        setBookings([]);
       }
       setAuthLoading(false);
     });
@@ -95,6 +108,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isVerified: false,
         points: 0
       });
+      setBookings([]);
     }
   };
 
@@ -105,6 +119,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Ignore logout errors if session already expired
     } finally {
       setUser(null);
+      setBookings([]);
     }
   };
 
@@ -140,6 +155,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isFavorite,
       bookings,
       addBooking,
+      refreshBookings,
       notifications,
       markNotificationRead
     }}>

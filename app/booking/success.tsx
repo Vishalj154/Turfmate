@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,16 +8,20 @@ import { Card } from '../../components/ui/Card';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_VENUES } from '../../data/mockData';
+import { getTurfByIdFromFirestore } from '../../services/turfService';
+import { Venue as UIVenue } from '../../types';
 
 export default function BookingSuccessScreen() {
-  const { venueId, date, timeSlot, amount } = useLocalSearchParams();
+  const { venueId, date, timeSlot, amount, bookingId } = useLocalSearchParams();
   const router = useRouter();
   const { isDark } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
-  const venue = MOCK_VENUES.find(v => v.id === venueId);
+  const [venue, setVenue] = useState<UIVenue | null>(null);
+
+  const vId = (typeof venueId === 'string' ? venueId : '') || '';
+  const displayBookingId = (typeof bookingId === 'string' ? bookingId : '') || `BKG-${Math.floor(100000 + Math.random() * 900000)}`;
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
@@ -25,7 +29,11 @@ export default function BookingSuccessScreen() {
       friction: 4,
       useNativeDriver: true,
     }).start();
-  }, []);
+
+    if (vId) {
+      getTurfByIdFromFirestore(vId).then(v => setVenue(v)).catch(() => {});
+    }
+  }, [vId]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }}>
@@ -36,12 +44,12 @@ export default function BookingSuccessScreen() {
 
         <Text variant="h1" style={styles.title}>Booking Confirmed!</Text>
         <Text variant="body" color={themeColors.textSecondary} align="center" style={styles.subtitle}>
-          Your booking has been successfully placed. You will receive a confirmation email shortly.
+          Your booking has been successfully recorded in Firestore.
         </Text>
 
         <Card style={styles.detailsCard}>
           <Text variant="caption" color={themeColors.textSecondary} style={{ marginBottom: 4 }}>Venue</Text>
-          <Text variant="h3" style={{ marginBottom: Spacing.md }}>{venue?.name}</Text>
+          <Text variant="h3" style={{ marginBottom: Spacing.md }}>{venue?.name || 'Turf Venue'}</Text>
 
           <View style={styles.row}>
             <View style={styles.col}>
@@ -59,7 +67,7 @@ export default function BookingSuccessScreen() {
           <View style={styles.row}>
             <View style={styles.col}>
               <Text variant="caption" color={themeColors.textSecondary} style={{ marginBottom: 4 }}>Booking ID</Text>
-              <Text variant="body" weight="bold">BKG-{Math.floor(100000 + Math.random() * 900000)}</Text>
+              <Text variant="body" weight="bold" numberOfLines={1}>{displayBookingId}</Text>
             </View>
             <View style={styles.col}>
               <Text variant="caption" color={themeColors.textSecondary} style={{ marginBottom: 4 }}>Amount</Text>

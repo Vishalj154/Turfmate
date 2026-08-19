@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Image, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Card } from '../../components/ui/Card';
@@ -7,30 +7,101 @@ import { Button } from '../../components/ui/Button';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_VENUES } from '../../data/mockData';
+import { useRouter } from 'expo-router';
+import { getTurfByIdFromFirestore } from '../../services/turfService';
+import { cancelBookingInFirestore } from '../../services/bookingService';
+import { Venue as UIVenue } from '../../types';
 
 const TABS = ['Upcoming', 'Completed', 'Cancelled'];
 
 export default function BookingsScreen() {
-  const { isDark, bookings } = useApp();
+  const { isDark, bookings, user, refreshBookings } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState('Upcoming');
+  const [venueCache, setVenueCache] = useState<{ [id: string]: UIVenue }>({});
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const filteredBookings = bookings.filter(b => b.status === activeTab);
 
-  const getVenue = (id: string) => MOCK_VENUES.find(v => v.id === id);
+  useEffect(() => {
+    async function fetchVenuesForBookings() {
+      const newCache = { ...venueCache };
+      let updated = false;
+
+      for (const b of bookings) {
+        if (!newCache[b.venueId]) {
+          try {
+            const v = await getTurfByIdFromFirestore(b.venueId);
+            if (v) {
+              newCache[b.venueId] = v;
+              updated = true;
+            }
+          } catch (e) {
+            console.error('Error fetching venue for booking:', e);
+          }
+        }
+      }
+
+      if (updated) {
+        setVenueCache(newCache);
+      }
+    }
+
+    if (bookings.length > 0) {
+      fetchVenuesForBookings();
+    }
+  }, [bookings]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshBookings();
+    setRefreshing(false);
+  };
+
+  const handleCancelBooking = (bookingId: string) => {
+    if (!user || user.id === 'guest') return;
+
+    Alert.alert(
+      'Cancel Booking',
+      'Are you sure you want to cancel this turf booking?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            setCancellingId(bookingId);
+            try {
+              await cancelBookingInFirestore(bookingId, user.id);
+              await refreshBookings();
+              Alert.alert('Booking Cancelled', 'Your booking has been cancelled successfully.');
+            } catch (err: any) {
+              Alert.alert('Cancellation Failed', err?.message || 'Unable to cancel booking.');
+            } finally {
+              setCancellingId(null);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const renderBooking = ({ item }: { item: any }) => {
-    const venue = getVenue(item.venueId);
-    if (!venue) return null;
+    const venue = venueCache[item.venueId];
+    const venueName = venue?.name || 'Turf Venue';
+    const venueLocation = venue?.location || 'Navi Mumbai';
+    const venueImage = venue?.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800';
 
     return (
       <Card style={styles.bookingCard}>
         <View style={styles.cardHeader}>
-          <Image source={{ uri: venue.image }} style={styles.venueImage} />
+          <Image source={{ uri: venueImage }} style={styles.venueImage} />
           <View style={styles.venueInfo}>
-            <Text variant="h3">{venue.name}</Text>
-            <Text variant="caption" color={themeColors.textSecondary}>{venue.location}</Text>
+            <Text variant="h3" numberOfLines={1}>{venueName}</Text>
+            <Text variant="caption" color={themeColors.textSecondary} numberOfLines={1}>{venueLocation}</Text>
           </View>
           <View style={[
             styles.statusBadge, 
@@ -64,8 +135,22 @@ export default function BookingsScreen() {
 
         {activeTab === 'Upcoming' && (
           <View style={styles.actionRow}>
-            <Button title="Cancel" variant="outline" size="sm" style={{ flex: 1, marginRight: Spacing.sm }} />
-            <Button title="View Details" variant="primary" size="sm" style={{ flex: 1 }} />
+            <Button 
+              title="Cancel" 
+              variant="outline" 
+              size="sm" 
+              loading={cancellingId === item.id}
+              disabled={cancellingId === item.id}
+              onPress={() => handleCancelBooking(item.id)}
+              style={{ flex: 1, marginRight: Spacing.sm }} 
+            />
+            <Button 
+              title="View Details" 
+              variant="primary" 
+              size="sm" 
+              onPress={() => router.push(`/venue/${item.venueId}`)}
+              style={{ flex: 1 }} 
+            />
           </View>
         )}
       </Card>
@@ -81,7 +166,7 @@ export default function BookingsScreen() {
       <Text variant="body" color={themeColors.textSecondary} align="center" style={{ marginBottom: Spacing.xl }}>
         You don't have any {activeTab.toLowerCase()} bookings.
       </Text>
-      <Button title="Explore Turfs" onPress={() => {}} />
+      <Button title="Explore Turfs" onPress={() => router.push('/(tabs)')} />
     </View>
   );
 
@@ -118,6 +203,14 @@ export default function BookingsScreen() {
         renderItem={renderBooking}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmptyState}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[themeColors.primary]}
+            tintColor={themeColors.primary}
+          />
+        }
       />
     </SafeAreaView>
   );

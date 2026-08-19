@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
@@ -7,7 +7,8 @@ import { Colors, Spacing, BorderRadius } from '../theme';
 import { useApp } from '../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { MOCK_VENUES } from '../data/mockData';
+import { getActiveTurfsFromFirestore } from '../services/turfService';
+import { Venue as UIVenue } from '../types';
 
 export default function SearchScreen() {
   const { isDark } = useApp();
@@ -15,10 +16,19 @@ export default function SearchScreen() {
   const router = useRouter();
   
   const [query, setQuery] = useState('');
+  const [venues, setVenues] = useState<UIVenue[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    getActiveTurfsFromFirestore()
+      .then((data) => setVenues(data))
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
   
   const results = query === '' 
-    ? MOCK_VENUES 
-    : MOCK_VENUES.filter(v => v.name.toLowerCase().includes(query.toLowerCase()) || v.location.toLowerCase().includes(query.toLowerCase()));
+    ? venues 
+    : venues.filter(v => v.name.toLowerCase().includes(query.toLowerCase()) || v.location.toLowerCase().includes(query.toLowerCase()));
 
   const renderVenueCard = ({ item }: { item: any }) => (
     <Card 

@@ -1,18 +1,20 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, FlatList, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { MOCK_VENUES, MOCK_TOURNAMENTS } from '../../data/mockData';
+import { getActiveTurfsFromFirestore } from '../../services/turfService';
+import { Venue as UIVenue } from '../../types';
 
 const CATEGORIES = [
   { id: '1', name: 'Cricket', icon: 'baseball-outline' },
   { id: '2', name: 'Football', icon: 'football-outline' },
-  { id: '3', name: 'Badminton', icon: 'tennisball-outline' }, // closest icon
+  { id: '3', name: 'Badminton', icon: 'tennisball-outline' },
   { id: '4', name: 'Swimming', icon: 'water-outline' },
   { id: '5', name: 'Tennis', icon: 'tennisball-outline' },
 ];
@@ -22,9 +24,30 @@ export default function HomeScreen() {
   const themeColors = isDark ? Colors.dark : Colors.light;
   const router = useRouter();
 
-  const turfs = MOCK_VENUES.filter(v => v.type === 'Turf').slice(0, 5);
-  const resorts = MOCK_VENUES.filter(v => v.type === 'Resort').slice(0, 3);
-  const tournaments = MOCK_TOURNAMENTS.slice(0, 3);
+  const [allVenues, setAllVenues] = useState<UIVenue[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchTurfs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getActiveTurfsFromFirestore();
+      setAllVenues(data);
+    } catch (err: any) {
+      console.error('Error fetching turfs:', err);
+      setError('Unable to load turfs right now. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTurfs();
+  }, []);
+
+  const turfs = allVenues.filter(v => v.type === 'Turf' || v.type === 'Sports Venue');
+  const resorts = allVenues.filter(v => v.type === 'Resort');
 
   const renderVenueCard = ({ item }: { item: any }) => (
     <Card 
@@ -131,14 +154,29 @@ export default function HomeScreen() {
               <Text variant="button" color={themeColors.primary}>See All</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={turfs}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={item => item.id}
-            renderItem={renderVenueCard}
-            contentContainerStyle={styles.listContent}
-          />
+          {loading ? (
+            <View style={{ padding: Spacing.xl, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={themeColors.primary} />
+            </View>
+          ) : error ? (
+            <View style={{ padding: Spacing.lg, alignItems: 'center' }}>
+              <Text variant="body" color={themeColors.error} style={{ marginBottom: Spacing.xs }}>{error}</Text>
+              <Button title="Retry" size="sm" variant="outline" onPress={fetchTurfs} />
+            </View>
+          ) : turfs.length === 0 ? (
+            <View style={{ padding: Spacing.lg, alignItems: 'center' }}>
+              <Text variant="body" color={themeColors.textSecondary}>No turfs available right now.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={turfs}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={item => item.id}
+              renderItem={renderVenueCard}
+              contentContainerStyle={styles.listContent}
+            />
+          )}
         </View>
 
         {/* Premium Resorts */}

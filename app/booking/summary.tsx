@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
@@ -8,50 +8,128 @@ import { Card } from '../../components/ui/Card';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_VENUES } from '../../data/mockData';
 import { Input } from '../../components/ui/Input';
+import { getTurfByIdFromFirestore } from '../../services/turfService';
+import { createBookingAtomic } from '../../services/bookingService';
+import { Venue as UIVenue } from '../../types';
 
 export default function BookingSummaryScreen() {
-  const { venueId, date, timeSlot } = useLocalSearchParams();
+  const { venueId, date, displayDate, startTime, endTime, timeSlot } = useLocalSearchParams();
   const router = useRouter();
-  const { isDark, user, addBooking } = useApp();
+  const { isDark, user, addBooking, refreshBookings } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
+
+  const [venue, setVenue] = useState<UIVenue | null>(null);
+  const [loadingVenue, setLoadingVenue] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [coupon, setCoupon] = useState('');
   const [discount, setDiscount] = useState(0);
 
-  const venue = MOCK_VENUES.find(v => v.id === venueId);
-  
-  if (!venue) return null;
+  const dateStr = (typeof date === 'string' ? date : '') || '';
+  const displayDateStr = (typeof displayDate === 'string' ? displayDate : dateStr) || dateStr;
+  const startTimeStr = (typeof startTime === 'string' ? startTime : '') || '';
+  const endTimeStr = (typeof endTime === 'string' ? endTime : '') || '';
+  const timeSlotStr = (typeof timeSlot === 'string' ? timeSlot : '') || '';
+  const vId = (typeof venueId === 'string' ? venueId : '') || '';
+
+  useEffect(() => {
+    if (vId) {
+      getTurfByIdFromFirestore(vId)
+        .then(v => setVenue(v))
+        .catch(err => console.error(err))
+        .finally(() => setLoadingVenue(false));
+    } else {
+      setLoadingVenue(false);
+    }
+  }, [vId]);
+
+  if (loadingVenue) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.background }}>
+        <ActivityIndicator size="large" color={themeColors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!venue) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.background }}>
+        <Text variant="h2" style={{ marginBottom: Spacing.md }}>Venue Not Found</Text>
+        <Button title="Go Back" onPress={() => router.back()} />
+      </SafeAreaView>
+    );
+  }
 
   const price = venue.pricePerHour;
   const platformFee = 50;
   const total = price + platformFee - discount;
 
   const handleApplyCoupon = () => {
-    if (coupon === 'WELCOME20') {
+    if (coupon.trim().toUpperCase() === 'WELCOME20') {
       setDiscount(Math.round(price * 0.2));
+      setErrorMessage(null);
     } else {
       setDiscount(0);
+      setErrorMessage('Invalid coupon code');
     }
   };
 
-  const handlePayment = () => {
-    // Generate mock booking
-    addBooking({
-      id: `BKG-${Math.floor(100000 + Math.random() * 900000)}`,
-      venueId: venue.id,
-      date: date as string,
-      timeSlot: timeSlot as string,
-      amount: total,
-      status: 'Upcoming'
-    });
-    
-    // Payment is assumed successful for demo
-    router.push({
-      pathname: '/booking/success',
-      params: { venueId, date, timeSlot, amount: total }
-    });
+  const handlePayment = async () => {
+    if (!user || user.id === 'guest') {
+      Alert.alert('Sign In Required', 'Please sign in to confirm your turf booking.');
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const newBooking = await createBookingAtomic({
+        userId: user.id,
+        venueId: venue.id,
+        date: dateStr,
+        startTime: startTimeStr,
+        endTime: endTimeStr,
+        timeSlotString: timeSlotStr,
+        players: 10,
+        amount: total,
+        couponId: discount > 0 ? 'WELCOME20' : null
+      });
+
+      addBooking(newBooking);
+      await refreshBookings();
+
+      router.push({
+        pathname: '/booking/success',
+        params: {
+          venueId: venue.id,
+          date: displayDateStr,
+          timeSlot: timeSlotStr,
+          amount: total,
+          bookingId: newBooking.id
+        }
+      });
+    } catch (err: any) {
+      console.error('Error executing booking transaction:', err);
+      if (err?.message === 'THIS_SLOT_IS_ALREADY_BOOKED') {
+        Alert.alert(
+          'Slot Already Booked',
+          'This time slot was just reserved by another user. Please select a different time slot.',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back()
+            }
+          ]
+        );
+      } else {
+        setErrorMessage(err?.message || 'Failed to complete booking. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -78,12 +156,12 @@ export default function BookingSummaryScreen() {
           
           <View style={styles.detailRow}>
             <Ionicons name="calendar-outline" size={20} color={themeColors.primary} />
-            <Text variant="body" style={{ marginLeft: Spacing.sm }}>{date}</Text>
+            <Text variant="body" style={{ marginLeft: Spacing.sm }}>{displayDateStr}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Ionicons name="time-outline" size={20} color={themeColors.primary} />
-            <Text variant="body" style={{ marginLeft: Spacing.sm }}>{timeSlot}</Text>
+            <Text variant="body" style={{ marginLeft: Spacing.sm }}>{timeSlotStr}</Text>
           </View>
           
           <View style={styles.detailRow}>
@@ -110,7 +188,12 @@ export default function BookingSummaryScreen() {
           </View>
           {discount > 0 && (
             <Text variant="caption" color={themeColors.success} style={{ marginTop: Spacing.xs }}>
-              Coupon applied successfully!
+              Coupon applied successfully! (20% Off)
+            </Text>
+          )}
+          {errorMessage && (
+            <Text variant="caption" color={themeColors.error} style={{ marginTop: Spacing.xs }}>
+              {errorMessage}
             </Text>
           )}
         </Card>
@@ -152,6 +235,8 @@ export default function BookingSummaryScreen() {
         <Button 
           title="Proceed to Pay" 
           size="lg" 
+          loading={submitting}
+          disabled={submitting}
           onPress={handlePayment}
           style={{ flex: 1.5 }}
         />

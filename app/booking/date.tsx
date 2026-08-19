@@ -8,39 +8,57 @@ import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
 
+export interface CalendarDate {
+  fullDate: string; // "YYYY-MM-DD"
+  displayDate: string; // "20 Aug 2026"
+  dayName: string;
+  dayNumber: number;
+  monthName: string;
+  monthYear: string;
+}
+
 export default function DateSelectionScreen() {
   const { venueId } = useLocalSearchParams();
   const router = useRouter();
   const { isDark } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
 
-  const [selectedDate, setSelectedDate] = useState<number>(12); // Mock date
+  // Generate 14 upcoming days starting from Today
+  const upcomingDates = React.useMemo(() => {
+    const list: CalendarDate[] = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
 
-  // Generate some mock dates for the calendar
-  const renderDates = () => {
-    const dates = [];
-    for (let i = 12; i <= 25; i++) {
-      const isSelected = selectedDate === i;
-      dates.push(
-        <TouchableOpacity 
-          key={i} 
-          style={[
-            styles.dateBox, 
-            { backgroundColor: isSelected ? themeColors.primary : themeColors.surface },
-            !isSelected && { borderColor: themeColors.border, borderWidth: 1 }
-          ]}
-          onPress={() => setSelectedDate(i)}
-        >
-          <Text variant="caption" color={isSelected ? Colors.light.surface : themeColors.textSecondary}>Oct</Text>
-          <Text variant="h2" color={isSelected ? Colors.light.surface : themeColors.textPrimary}>{i}</Text>
-          <Text variant="caption" color={isSelected ? Colors.light.surface : themeColors.textSecondary}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i % 7]}
-          </Text>
-        </TouchableOpacity>
-      );
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(d.getDate()).padStart(2, '0');
+      const fullDate = `${year}-${month}-${dayStr}`;
+
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthFullNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+      const monthName = monthNames[d.getMonth()];
+      const monthYear = `${monthFullNames[d.getMonth()]} ${year}`;
+      const dayName = i === 0 ? 'Today' : dayNames[d.getDay()];
+      const displayDate = `${d.getDate()} ${monthName} ${year}`;
+
+      list.push({
+        fullDate,
+        displayDate,
+        dayName,
+        dayNumber: d.getDate(),
+        monthName,
+        monthYear
+      });
     }
-    return dates;
-  };
+    return list;
+  }, []);
+
+  const [selectedDate, setSelectedDate] = useState<CalendarDate>(upcomingDates[0]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }}>
@@ -54,15 +72,33 @@ export default function DateSelectionScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.monthHeader}>
-          <Text variant="h3">October 2026</Text>
+          <Text variant="h3">{selectedDate.monthYear}</Text>
           <View style={styles.arrows}>
-            <Ionicons name="chevron-back" size={24} color={themeColors.textSecondary} />
-            <Ionicons name="chevron-forward" size={24} color={themeColors.primary} style={{ marginLeft: Spacing.md }} />
+            <Ionicons name="calendar-outline" size={24} color={themeColors.primary} />
           </View>
         </View>
         
         <View style={styles.calendar}>
-          {renderDates()}
+          {upcomingDates.map((item) => {
+            const isSelected = selectedDate.fullDate === item.fullDate;
+            return (
+              <TouchableOpacity 
+                key={item.fullDate} 
+                style={[
+                  styles.dateBox, 
+                  { backgroundColor: isSelected ? themeColors.primary : themeColors.surface },
+                  !isSelected && { borderColor: themeColors.border, borderWidth: 1 }
+                ]}
+                onPress={() => setSelectedDate(item)}
+              >
+                <Text variant="caption" color={isSelected ? Colors.light.surface : themeColors.textSecondary}>{item.monthName}</Text>
+                <Text variant="h2" color={isSelected ? Colors.light.surface : themeColors.textPrimary}>{item.dayNumber}</Text>
+                <Text variant="caption" color={isSelected ? Colors.light.surface : themeColors.textSecondary}>
+                  {item.dayName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
 
@@ -70,7 +106,7 @@ export default function DateSelectionScreen() {
         <Button 
           title="Continue to Time Slots" 
           size="lg" 
-          onPress={() => router.push(`/booking/slot?venueId=${venueId}&date=12 Oct 2026`)}
+          onPress={() => router.push(`/booking/slot?venueId=${venueId}&date=${encodeURIComponent(selectedDate.fullDate)}&displayDate=${encodeURIComponent(selectedDate.displayDate)}`)}
           style={{ flex: 1 }}
         />
       </View>
