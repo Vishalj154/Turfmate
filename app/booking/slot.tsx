@@ -69,7 +69,10 @@ export default function SlotSelectionScreen() {
     loadSlotData();
   }, [vId, dateStr]);
 
-  const isSlotBooked = (slot: SlotOption) => bookedStartTimes.includes(slot.startTime);
+  const isSlotBooked = (slot: SlotOption) => {
+    const normSlot = slot.startTime.trim().toUpperCase();
+    return bookedStartTimes.some((b) => b.trim().toUpperCase() === normSlot);
+  };
 
   const morningSlots = ALL_SLOTS.filter(s => s.period === 'morning');
   const eveningSlots = ALL_SLOTS.filter(s => s.period === 'evening');

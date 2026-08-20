@@ -27,9 +27,10 @@ export interface CreateBookingParams {
 
 // Generate a deterministic timeSlot document ID for atomic transaction locking
 export const getSlotDocId = (venueId: string, date: string, startTime: string): string => {
-  const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '_');
-  const cleanTime = startTime.replace(/[^a-zA-Z0-9]/g, '_');
-  return `${venueId}_${cleanDate}_${cleanTime}`;
+  const cleanVenue = venueId.trim();
+  const cleanDate = date.trim().replace(/[^a-zA-Z0-9]/g, '_');
+  const cleanTime = startTime.trim().toUpperCase().replace(/[^a-zA-Z0-9]/g, '_');
+  return `${cleanVenue}_${cleanDate}_${cleanTime}`;
 };
 
 /**
@@ -46,7 +47,11 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
   }
   const authenticatedUid = currentUser.uid;
 
-  const slotDocId = getSlotDocId(params.venueId, params.date, params.startTime);
+  const normalizedVenueId = params.venueId.trim();
+  const normalizedDate = params.date.trim();
+  const normalizedStartTime = params.startTime.trim().toUpperCase();
+
+  const slotDocId = getSlotDocId(normalizedVenueId, normalizedDate, normalizedStartTime);
   const slotRef = doc(db, 'timeSlots', slotDocId);
   const bookingRef = doc(collection(db, 'bookings'));
   const newBookingId = bookingRef.id;
@@ -63,10 +68,10 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
       // Set timeSlot document reservation
       transaction.set(slotRef, {
         id: slotDocId,
-        venueId: params.venueId,
-        date: params.date,
-        startTime: params.startTime,
-        endTime: params.endTime,
+        venueId: normalizedVenueId,
+        date: normalizedDate,
+        startTime: normalizedStartTime,
+        endTime: params.endTime.trim().toUpperCase(),
         status: 'booked',
         bookingId: newBookingId
       });
@@ -76,10 +81,10 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
       transaction.set(bookingRef, {
         id: newBookingId,
         userId: authenticatedUid,
-        venueId: params.venueId,
-        date: params.date,
-        startTime: params.startTime,
-        endTime: params.endTime,
+        venueId: normalizedVenueId,
+        date: normalizedDate,
+        startTime: normalizedStartTime,
+        endTime: params.endTime.trim().toUpperCase(),
         timeSlot: params.timeSlotString,
         players: params.players || 10,
         amount: params.amount,
@@ -102,8 +107,8 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
 
   return {
     id: newBookingId,
-    venueId: params.venueId,
-    date: params.date,
+    venueId: normalizedVenueId,
+    date: normalizedDate,
     timeSlot: params.timeSlotString,
     amount: params.amount,
     status: 'Upcoming'
@@ -115,11 +120,14 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
  */
 export const getBookedSlotsForVenueAndDate = async (venueId: string, date: string): Promise<string[]> => {
   try {
+    const normalizedVenueId = venueId.trim();
+    const normalizedDate = date.trim();
+
     const timeSlotsRef = collection(db, 'timeSlots');
     const q = query(
       timeSlotsRef,
-      where('venueId', '==', venueId),
-      where('date', '==', date),
+      where('venueId', '==', normalizedVenueId),
+      where('date', '==', normalizedDate),
       where('status', '==', 'booked')
     );
     const snapshot = await getDocs(q);
@@ -128,7 +136,7 @@ export const getBookedSlotsForVenueAndDate = async (venueId: string, date: strin
     snapshot.forEach((dSnap) => {
       const data = dSnap.data();
       if (data.startTime) {
-        bookedTimes.push(data.startTime);
+        bookedTimes.push(data.startTime.trim().toUpperCase());
       }
     });
 

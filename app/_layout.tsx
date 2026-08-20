@@ -60,6 +60,10 @@ const RootNavigation = () => {
         <Stack.Screen name="booking/detail" />
         <Stack.Screen name="search" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="support" />
+        <Stack.Screen name="terms" />
+        <Stack.Screen name="privacy" />
+        <Stack.Screen name="about" />
       </Stack>
     </View>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Switch, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Card } from '../../components/ui/Card';
@@ -15,6 +15,23 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: 'Check out TurfMate — find and book sports turfs easily!',
+      });
+    } catch (error) {
+      console.error('Error sharing app:', error);
+    }
+  };
+
+  const handleRate = () => {
+    Alert.alert(
+      'Rate TurfMate',
+      'Rating will be available once TurfMate is published on the Play Store.'
+    );
   };
 
   const MenuItem = ({ icon, title, value, onPress, hasSwitch, switchValue, onSwitch }: any) => (
@@ -99,10 +116,36 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <Text variant="h3" style={styles.sectionTitle}>Support</Text>
             <Card style={{ padding: 0 }}>
-              <MenuItem icon="help-circle-outline" title="Help & Support" />
-              <MenuItem icon="document-text-outline" title="Terms & Conditions" />
-              <MenuItem icon="shield-checkmark-outline" title="Privacy Policy" />
-              <MenuItem icon="information-circle-outline" title="About TurfMate" />
+              <MenuItem 
+                icon="help-circle-outline" 
+                title="Help & Support" 
+                onPress={() => router.push('/support')} 
+              />
+              <MenuItem 
+                icon="document-text-outline" 
+                title="Terms & Conditions" 
+                onPress={() => router.push('/terms')} 
+              />
+              <MenuItem 
+                icon="shield-checkmark-outline" 
+                title="Privacy Policy" 
+                onPress={() => router.push('/privacy')} 
+              />
+              <MenuItem 
+                icon="information-circle-outline" 
+                title="About TurfMate" 
+                onPress={() => router.push('/about')} 
+              />
+              <MenuItem 
+                icon="share-social-outline" 
+                title="Share TurfMate" 
+                onPress={handleShare} 
+              />
+              <MenuItem 
+                icon="star-outline" 
+                title="Rate TurfMate" 
+                onPress={handleRate} 
+              />
             </Card>
           </View>
 
