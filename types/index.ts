@@ -15,6 +15,9 @@ export interface Venue {
   facilities: string[];
   openingHours: string;
   description: string;
+  latitude?: number;
+  longitude?: number;
+  distanceKm?: number;
 }
 
 export interface Tournament {

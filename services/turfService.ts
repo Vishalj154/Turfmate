@@ -18,6 +18,9 @@ export const mapSchemaToUIVenue = (v: SchemaVenue | any): UIVenue => {
     ? `${v.location.area || ''}, ${v.location.city || ''}`
     : (typeof v.location === 'string' ? v.location : 'Navi Mumbai');
 
+  const lat = typeof v.location === 'object' && v.location !== null ? v.location.latitude : v.latitude;
+  const lng = typeof v.location === 'object' && v.location !== null ? v.location.longitude : v.longitude;
+
   return {
     id: v.id,
     name: v.name,
@@ -32,7 +35,9 @@ export const mapSchemaToUIVenue = (v: SchemaVenue | any): UIVenue => {
     gallery: galleryImages,
     facilities: Array.isArray(v.facilities) ? v.facilities : ['Parking', 'Washrooms', 'Floodlights'],
     openingHours: '06:00 AM - 11:00 PM',
-    description: v.description || 'Premium astroturf for football and box cricket.'
+    description: v.description || 'Premium astroturf for football and box cricket.',
+    latitude: typeof lat === 'number' ? lat : undefined,
+    longitude: typeof lng === 'number' ? lng : undefined,
   };
 };
 
@@ -68,31 +73,47 @@ export const seedInitialVenuesIfEmpty = async (): Promise<void> => {
  * Fetches all active turfs from Cloud Firestore.
  */
 export const getActiveTurfsFromFirestore = async (): Promise<UIVenue[]> => {
-  await seedInitialVenuesIfEmpty();
+  try {
+    await seedInitialVenuesIfEmpty();
 
-  const venuesRef = collection(db, 'venues');
-  const q = query(venuesRef, where('isActive', '==', true));
-  const snapshot = await getDocs(q);
+    const venuesRef = collection(db, 'venues');
+    const q = query(venuesRef, where('isActive', '==', true));
+    const snapshot = await getDocs(q);
 
-  const venues: UIVenue[] = [];
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    venues.push(mapSchemaToUIVenue({ ...data, id: docSnap.id }));
-  });
+    const venues: UIVenue[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      venues.push(mapSchemaToUIVenue({ ...data, id: docSnap.id }));
+    });
 
-  return venues;
+    if (venues.length === 0) {
+      return sampleVenues.map((sample) => mapSchemaToUIVenue(sample));
+    }
+
+    return venues;
+  } catch (error) {
+    console.warn('Network or Firestore unavailable. Falling back to cached sample venues:', error);
+    return sampleVenues.map((sample) => mapSchemaToUIVenue(sample));
+  }
 };
 
 /**
  * Fetches a single turf/venue by ID from Cloud Firestore.
  */
 export const getTurfByIdFromFirestore = async (id: string): Promise<UIVenue | null> => {
-  const docRef = doc(db, 'venues', id);
-  const docSnap = await getDoc(docRef);
+  try {
+    const docRef = doc(db, 'venues', id);
+    const docSnap = await getDoc(docRef);
 
-  if (!docSnap.exists()) {
-    return null;
+    if (!docSnap.exists()) {
+      const sample = sampleVenues.find((s) => s.id === id);
+      return sample ? mapSchemaToUIVenue(sample) : null;
+    }
+
+    return mapSchemaToUIVenue({ ...docSnap.data(), id: docSnap.id });
+  } catch (error) {
+    console.warn('Network error fetching turf by ID. Falling back to local venue data:', error);
+    const sample = sampleVenues.find((s) => s.id === id);
+    return sample ? mapSchemaToUIVenue(sample) : null;
   }
-
-  return mapSchemaToUIVenue({ ...docSnap.data(), id: docSnap.id });
 };

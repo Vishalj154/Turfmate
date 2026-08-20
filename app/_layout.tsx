@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 import { AppProvider, useApp } from '../store/AppContext';
 import { ActivityIndicator, View } from 'react-native';
 import { Colors } from '../theme';
+import { OfflineBanner } from '../components/OfflineBanner';
 
 // Wrapper component to handle routing logic based on state
 const RootNavigation = () => {
@@ -45,6 +46,7 @@ const RootNavigation = () => {
   return (
     <View style={{ flex: 1, backgroundColor }}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <OfflineBanner />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />

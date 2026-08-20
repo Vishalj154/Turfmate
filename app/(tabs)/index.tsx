@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Card } from '../../components/ui/Card';
@@ -10,6 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getActiveTurfsFromFirestore } from '../../services/turfService';
 import { Venue as UIVenue } from '../../types';
+import { useUserLocation } from '../../hooks/useUserLocation';
+import { calculateDistance } from '../../services/locationService';
 
 const CATEGORIES = [
   { id: '1', name: 'Cricket', icon: 'baseball-outline' },
@@ -27,6 +29,15 @@ export default function HomeScreen() {
   const [allVenues, setAllVenues] = useState<UIVenue[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortByNearest, setSortByNearest] = useState<boolean>(false);
+
+  const {
+    location,
+    permissionState,
+    loading: locationLoading,
+    error: locationError,
+    requestLocation,
+  } = useUserLocation();
 
   const fetchTurfs = async () => {
     setLoading(true);
@@ -46,8 +57,50 @@ export default function HomeScreen() {
     fetchTurfs();
   }, []);
 
-  const turfs = allVenues.filter(v => v.type === 'Turf' || v.type === 'Sports Venue');
-  const resorts = allVenues.filter(v => v.type === 'Resort');
+  const processedVenues = useMemo(() => {
+    return allVenues.map((v) => {
+      if (location && typeof v.latitude === 'number' && typeof v.longitude === 'number') {
+        const distKm = calculateDistance(location.latitude, location.longitude, v.latitude, v.longitude);
+        return {
+          ...v,
+          distance: `${distKm} km`,
+          distanceKm: distKm,
+        };
+      }
+      return v;
+    });
+  }, [allVenues, location]);
+
+  const turfs = useMemo(() => {
+    const list = processedVenues.filter((v) => v.type === 'Turf' || v.type === 'Sports Venue');
+    if (sortByNearest && location) {
+      return [...list].sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+    }
+    return list;
+  }, [processedVenues, sortByNearest, location]);
+
+  const resorts = useMemo(() => {
+    return processedVenues.filter((v) => v.type === 'Resort');
+  }, [processedVenues]);
+
+  const handleLocationPress = async () => {
+    if (permissionState === 'granted' && location) {
+      Alert.alert(
+        'GPS Location Active',
+        `Current Coordinates:\nLatitude: ${location.latitude.toFixed(4)}\nLongitude: ${location.longitude.toFixed(4)}\n\nTurf distances are calculated live using your current GPS location.`,
+        [{ text: 'OK' }]
+      );
+    } else {
+      const coords = await requestLocation();
+      if (!coords && permissionState === 'denied') {
+        Alert.alert(
+          'Location Access Required',
+          'Location permission allows TurfMate to show nearby turfs and precise distances. Standard listings are displayed.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  };
 
   const renderVenueCard = ({ item }: { item: any }) => (
     <Card 
@@ -99,10 +152,17 @@ export default function HomeScreen() {
             </View>
             <View>
               <Text variant="caption" color={themeColors.textSecondary}>Good evening, {user?.name?.split(' ')[0] || 'Guest'} 👋</Text>
-              <View style={styles.locationContainer}>
-                <Ionicons name="location-sharp" size={14} color={themeColors.primary} />
-                <Text variant="body" weight="medium">Vashi, Navi Mumbai</Text>
-              </View>
+              <TouchableOpacity style={styles.locationContainer} onPress={handleLocationPress} activeOpacity={0.7}>
+                <Ionicons name="location-sharp" size={14} color={location ? '#2E7D32' : themeColors.primary} />
+                <Text variant="body" weight="medium" style={{ marginLeft: 2 }}>
+                  {location ? 'GPS Location (Active)' : 'Vashi, Navi Mumbai'}
+                </Text>
+                {locationLoading ? (
+                  <ActivityIndicator size="small" color={themeColors.primary} style={{ marginLeft: 4 }} />
+                ) : (
+                  <Ionicons name="chevron-down" size={14} color={themeColors.textSecondary} style={{ marginLeft: 2 }} />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
           <TouchableOpacity style={[styles.iconButton, { backgroundColor: themeColors.surface }]}>
@@ -123,7 +183,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Banner Carousel (Static for now) */}
+        {/* Banner Carousel */}
         <View style={styles.bannerContainer}>
           <Card style={[styles.banner, { backgroundColor: themeColors.primary }]}>
             <View style={styles.bannerContent}>
@@ -149,7 +209,32 @@ export default function HomeScreen() {
         {/* Popular Turfs */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text variant="h3">Popular Turfs</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <Text variant="h3">Popular Turfs</Text>
+              {location && (
+                <TouchableOpacity
+                  style={[
+                    styles.nearestChip,
+                    sortByNearest ? { backgroundColor: themeColors.primary } : { backgroundColor: themeColors.surface, borderWidth: 1, borderColor: themeColors.border }
+                  ]}
+                  onPress={() => setSortByNearest(!sortByNearest)}
+                >
+                  <Ionicons
+                    name="navigate"
+                    size={12}
+                    color={sortByNearest ? Colors.light.surface : themeColors.primary}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    variant="caption"
+                    weight="medium"
+                    color={sortByNearest ? Colors.light.surface : themeColors.primary}
+                  >
+                    {sortByNearest ? 'Nearest First' : 'Sort by Nearest'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <TouchableOpacity onPress={() => router.push('/search')}>
               <Text variant="button" color={themeColors.primary}>See All</Text>
             </TouchableOpacity>
@@ -373,5 +458,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
+  },
+  nearestChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.round,
+    marginLeft: 4,
   }
 });

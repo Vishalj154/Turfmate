@@ -11,6 +11,7 @@ import {
 import { db } from './firebase';
 import { Booking as SchemaBooking } from '../database/schema';
 import { Booking as UIBooking } from '../types';
+import { getFirestoreErrorMessage } from './firebaseErrors';
 
 export interface CreateBookingParams {
   userId: string;
@@ -41,42 +42,50 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
   const bookingRef = doc(collection(db, 'bookings'));
   const newBookingId = bookingRef.id;
 
-  await runTransaction(db, async (transaction) => {
-    // Read the timeSlot document atomically inside transaction
-    const slotSnap = await transaction.get(slotRef);
+  try {
+    await runTransaction(db, async (transaction) => {
+      // Read the timeSlot document atomically inside transaction
+      const slotSnap = await transaction.get(slotRef);
 
-    if (slotSnap.exists() && slotSnap.data().status === 'booked') {
-      throw new Error('THIS_SLOT_IS_ALREADY_BOOKED');
+      if (slotSnap.exists() && slotSnap.data().status === 'booked') {
+        throw new Error('THIS_SLOT_IS_ALREADY_BOOKED');
+      }
+
+      // Set timeSlot document reservation
+      transaction.set(slotRef, {
+        id: slotDocId,
+        venueId: params.venueId,
+        date: params.date,
+        startTime: params.startTime,
+        endTime: params.endTime,
+        status: 'booked',
+        bookingId: newBookingId
+      });
+
+      // Set booking document in Firestore
+      transaction.set(bookingRef, {
+        id: newBookingId,
+        userId: params.userId,
+        venueId: params.venueId,
+        date: params.date,
+        startTime: params.startTime,
+        endTime: params.endTime,
+        timeSlot: params.timeSlotString,
+        players: params.players || 10,
+        amount: params.amount,
+        paymentStatus: 'paid',
+        bookingStatus: 'confirmed',
+        couponId: params.couponId || null,
+        createdAt: serverTimestamp()
+      });
+    });
+  } catch (error: any) {
+    if (error?.message === 'THIS_SLOT_IS_ALREADY_BOOKED') {
+      throw error;
     }
-
-    // Set timeSlot document reservation
-    transaction.set(slotRef, {
-      id: slotDocId,
-      venueId: params.venueId,
-      date: params.date,
-      startTime: params.startTime,
-      endTime: params.endTime,
-      status: 'booked',
-      bookingId: newBookingId
-    });
-
-    // Set booking document in Firestore
-    transaction.set(bookingRef, {
-      id: newBookingId,
-      userId: params.userId,
-      venueId: params.venueId,
-      date: params.date,
-      startTime: params.startTime,
-      endTime: params.endTime,
-      timeSlot: params.timeSlotString,
-      players: params.players || 10,
-      amount: params.amount,
-      paymentStatus: 'paid',
-      bookingStatus: 'confirmed',
-      couponId: params.couponId || null,
-      createdAt: serverTimestamp()
-    });
-  });
+    const friendlyMsg = getFirestoreErrorMessage(error);
+    throw new Error(friendlyMsg);
+  }
 
   return {
     id: newBookingId,

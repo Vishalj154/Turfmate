@@ -30,3 +30,36 @@ export function getFirebaseAuthErrorMessage(error: unknown): string {
   
   return 'An unknown error occurred.';
 }
+
+export function getFirestoreErrorMessage(error: unknown): string {
+  if (error instanceof FirebaseError) {
+    switch (error.code) {
+      case 'unavailable':
+        return 'Network connection unavailable. Operating in offline mode.';
+      case 'failed-precondition':
+        return 'Operation failed due to network condition or conflict. Please try again.';
+      case 'deadline-exceeded':
+        return 'The request timed out due to slow network connection. Please try again.';
+      case 'permission-denied':
+        return 'Permission denied to access this resource.';
+      case 'unauthenticated':
+        return 'Session expired. Please log in again.';
+      case 'resource-exhausted':
+        return 'Server limit reached. Please try again in a few moments.';
+      case 'cancelled':
+        return 'Operation was cancelled.';
+      default:
+        return 'Database connection error. Please check your internet connection.';
+    }
+  }
+
+  if (error instanceof Error) {
+    if (error.message.includes('network') || error.message.includes('offline') || error.message.includes('fetch')) {
+      return 'Network connection error. Operating in offline mode.';
+    }
+    return error.message;
+  }
+
+  return 'Unable to complete database request. Please check your connection.';
+}
+

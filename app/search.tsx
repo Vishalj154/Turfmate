@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getActiveTurfsFromFirestore } from '../services/turfService';
 import { Venue as UIVenue } from '../types';
+import { useUserLocation } from '../hooks/useUserLocation';
+import { calculateDistance } from '../services/locationService';
 
 export default function SearchScreen() {
   const { isDark } = useApp();
@@ -18,6 +20,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [venues, setVenues] = useState<UIVenue[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const { location } = useUserLocation();
 
   useEffect(() => {
     getActiveTurfsFromFirestore()
@@ -25,10 +28,21 @@ export default function SearchScreen() {
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, []);
+
+  const processedVenues = venues.map((v) => {
+    if (location && typeof v.latitude === 'number' && typeof v.longitude === 'number') {
+      const distKm = calculateDistance(location.latitude, location.longitude, v.latitude, v.longitude);
+      return {
+        ...v,
+        distance: `${distKm} km`,
+      };
+    }
+    return v;
+  });
   
   const results = query === '' 
-    ? venues 
-    : venues.filter(v => v.name.toLowerCase().includes(query.toLowerCase()) || v.location.toLowerCase().includes(query.toLowerCase()));
+    ? processedVenues 
+    : processedVenues.filter(v => v.name.toLowerCase().includes(query.toLowerCase()) || v.location.toLowerCase().includes(query.toLowerCase()));
 
   const renderVenueCard = ({ item }: { item: any }) => (
     <Card 
