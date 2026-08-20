@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -18,6 +18,7 @@ export default function BookingSummaryScreen() {
   const router = useRouter();
   const { isDark, user, addBooking, refreshBookings } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
 
   const [venue, setVenue] = useState<UIVenue | null>(null);
   const [loadingVenue, setLoadingVenue] = useState<boolean>(true);
@@ -117,15 +118,16 @@ export default function BookingSummaryScreen() {
         Alert.alert(
           'Slot Already Booked',
           'This time slot was just reserved by another user. Please select a different time slot.',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.back()
-            }
-          ]
+          [{ text: 'OK', onPress: () => router.back() }]
         );
+      } else if (err?.message === 'Please log in before making a booking.') {
+        Alert.alert('Sign In Required', 'Please sign in to confirm your turf booking.');
+      } else if (err?.message?.toLowerCase().includes('permission') || err?.message?.toLowerCase().includes('denied')) {
+        setErrorMessage('Unable to complete booking. Please ensure you are signed in and try again.');
+      } else if (err?.message?.toLowerCase().includes('network') || err?.message?.toLowerCase().includes('offline')) {
+        setErrorMessage('Network error. Please check your internet connection and try again.');
       } else {
-        setErrorMessage(err?.message || 'Failed to complete booking. Please try again.');
+        setErrorMessage('Unable to complete booking. Please try again.');
       }
     } finally {
       setSubmitting(false);
@@ -227,13 +229,13 @@ export default function BookingSummaryScreen() {
         </Card>
       </ScrollView>
 
-      <View style={[styles.bottomBar, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border }]}>
+      <View style={[styles.bottomBar, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border, paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
         <View style={{ flex: 1 }}>
           <Text variant="caption" color={themeColors.textSecondary}>To Pay</Text>
           <Text variant="h2" color={themeColors.primary}>₹{total}</Text>
         </View>
         <Button 
-          title="Proceed to Pay" 
+          title="Confirm Booking" 
           size="lg" 
           loading={submitting}
           disabled={submitting}
@@ -306,7 +308,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.lg,
-    paddingBottom: 30, // Safe area
     borderTopWidth: 1,
   }
 });

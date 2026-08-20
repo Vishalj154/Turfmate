@@ -8,7 +8,7 @@ import {
   runTransaction,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { Booking as SchemaBooking } from '../database/schema';
 import { Booking as UIBooking } from '../types';
 import { getFirestoreErrorMessage } from './firebaseErrors';
@@ -37,6 +37,15 @@ export const getSlotDocId = (venueId: string, date: string, startTime: string): 
  * Prevents race conditions and double-booking.
  */
 export const createBookingAtomic = async (params: CreateBookingParams): Promise<UIBooking> => {
+  // Always use the authenticated Firebase UID directly.
+  // This is the authoritative identity — it must match request.auth.uid in Firestore rules.
+  // Do NOT rely solely on params.userId which comes from UI state.
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('Please log in before making a booking.');
+  }
+  const authenticatedUid = currentUser.uid;
+
   const slotDocId = getSlotDocId(params.venueId, params.date, params.startTime);
   const slotRef = doc(db, 'timeSlots', slotDocId);
   const bookingRef = doc(collection(db, 'bookings'));
@@ -62,10 +71,11 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
         bookingId: newBookingId
       });
 
-      // Set booking document in Firestore
+      // Set booking document in Firestore.
+      // userId must equal the authenticated Firebase UID for Firestore rules to allow the write.
       transaction.set(bookingRef, {
         id: newBookingId,
-        userId: params.userId,
+        userId: authenticatedUid,
         venueId: params.venueId,
         date: params.date,
         startTime: params.startTime,
@@ -81,6 +91,9 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
     });
   } catch (error: any) {
     if (error?.message === 'THIS_SLOT_IS_ALREADY_BOOKED') {
+      throw error;
+    }
+    if (error?.message === 'Please log in before making a booking.') {
       throw error;
     }
     const friendlyMsg = getFirestoreErrorMessage(error);

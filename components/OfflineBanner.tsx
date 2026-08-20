@@ -11,7 +11,8 @@ export const OfflineBanner: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [showRestored, setShowRestored] = useState<boolean>(false);
   const wasOffline = useRef<boolean>(false);
-  const slideAnim = useRef(new Animated.Value(-50)).current;
+  // Start far enough off-screen to account for status bar height on any device
+  const slideAnim = useRef(new Animated.Value(-150)).current;
 
   useEffect(() => {
     if (!isOnline) {
@@ -33,7 +34,7 @@ export const OfflineBanner: React.FC = () => {
 
         const timer = setTimeout(() => {
           Animated.timing(slideAnim, {
-            toValue: -50,
+            toValue: -150,
             duration: 300,
             useNativeDriver: true,
           }).start(() => {
@@ -45,7 +46,7 @@ export const OfflineBanner: React.FC = () => {
         return () => clearTimeout(timer);
       } else {
         Animated.timing(slideAnim, {
-          toValue: -50,
+          toValue: -150,
           duration: 0,
           useNativeDriver: true,
         }).start();
@@ -57,7 +58,7 @@ export const OfflineBanner: React.FC = () => {
     return null;
   }
 
-  const backgroundColor = showRestored ? Colors.light.success : '#D97706'; // Orange-amber for offline warning
+  const backgroundColor = showRestored ? Colors.light.success : '#D97706';
   const message = showRestored ? 'Back online' : 'No internet connection';
   const iconName = showRestored ? 'wifi' : 'wifi-outline';
 
@@ -82,7 +83,10 @@ export const OfflineBanner: React.FC = () => {
 
 const styles = StyleSheet.create({
   banner: {
-    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     paddingVertical: 6,
     paddingHorizontal: Spacing.md,
     flexDirection: 'row',
