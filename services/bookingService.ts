@@ -132,22 +132,6 @@ export const getBookedSlotsForVenueAndDate = async (venueId: string, date: strin
       }
     });
 
-    // Also check bookings collection as fallback
-    const bookingsRef = collection(db, 'bookings');
-    const qBookings = query(
-      bookingsRef,
-      where('venueId', '==', venueId),
-      where('date', '==', date),
-      where('bookingStatus', 'in', ['pending', 'confirmed'])
-    );
-    const bookingSnapshot = await getDocs(qBookings);
-    bookingSnapshot.forEach((bSnap) => {
-      const bData = bSnap.data();
-      if (bData.startTime && !bookedTimes.includes(bData.startTime)) {
-        bookedTimes.push(bData.startTime);
-      }
-    });
-
     return bookedTimes;
   } catch (error) {
     console.error('Error fetching booked slots:', error);

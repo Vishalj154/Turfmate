@@ -74,8 +74,6 @@ export const seedInitialVenuesIfEmpty = async (): Promise<void> => {
  */
 export const getActiveTurfsFromFirestore = async (): Promise<UIVenue[]> => {
   try {
-    await seedInitialVenuesIfEmpty();
-
     const venuesRef = collection(db, 'venues');
     const q = query(venuesRef, where('isActive', '==', true));
     const snapshot = await getDocs(q);
