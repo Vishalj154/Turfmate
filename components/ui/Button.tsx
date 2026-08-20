@@ -97,6 +97,8 @@ export const Button: React.FC<ButtonProps> = ({
           {leftIcon && <React.Fragment>{leftIcon}</React.Fragment>}
           <Text 
             variant="button" 
+            color={variantStyles.text.color as string}
+            weight="bold"
             style={[styles.text, variantStyles.text, (leftIcon || rightIcon) ? { marginHorizontal: Spacing.sm } : undefined]}
           >
             {title}
@@ -114,6 +116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: BorderRadius.md,
+    minHeight: 48,
   },
   text: {
     textAlign: 'center',

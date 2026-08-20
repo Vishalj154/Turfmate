@@ -57,6 +57,7 @@ const RootNavigation = () => {
         <Stack.Screen name="booking/slot" />
         <Stack.Screen name="booking/summary" />
         <Stack.Screen name="booking/success" />
+        <Stack.Screen name="booking/detail" />
         <Stack.Screen name="search" />
         <Stack.Screen name="settings" />
       </Stack>

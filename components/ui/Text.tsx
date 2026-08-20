@@ -31,7 +31,7 @@ export const Text: React.FC<TextProps> = ({
       case 'h3':
         return { fontSize: Typography.sizes.lg, fontWeight: Typography.weights.semiBold };
       case 'button':
-        return { fontSize: Typography.sizes.md, fontWeight: Typography.weights.semiBold };
+        return { fontSize: Typography.sizes.md, fontWeight: Typography.weights.bold };
       case 'caption':
         return { fontSize: Typography.sizes.xs, color: themeColors.textSecondary };
       case 'body':

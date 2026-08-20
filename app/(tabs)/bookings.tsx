@@ -133,8 +133,8 @@ export default function BookingsScreen() {
           </View>
         </View>
 
-        {activeTab === 'Upcoming' && (
-          <View style={styles.actionRow}>
+        <View style={styles.actionRow}>
+          {activeTab === 'Upcoming' && (
             <Button 
               title="Cancel" 
               variant="outline" 
@@ -144,15 +144,25 @@ export default function BookingsScreen() {
               onPress={() => handleCancelBooking(item.id)}
               style={{ flex: 1, marginRight: Spacing.sm }} 
             />
-            <Button 
-              title="View Details" 
-              variant="primary" 
-              size="sm" 
-              onPress={() => router.push(`/venue/${item.venueId}`)}
-              style={{ flex: 1 }} 
-            />
-          </View>
-        )}
+          )}
+          <Button 
+            title="View Details" 
+            variant="primary" 
+            size="sm" 
+            onPress={() => router.push({
+              pathname: '/booking/detail',
+              params: {
+                bookingId: item.id,
+                venueId: item.venueId,
+                date: item.date,
+                timeSlot: item.timeSlot,
+                amount: item.amount,
+                status: item.status
+              }
+            })}
+            style={{ flex: 1 }} 
+          />
+        </View>
       </Card>
     );
   };

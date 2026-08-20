@@ -155,5 +155,7 @@ const styles = StyleSheet.create({
   bottomBar: {
     padding: Spacing.lg,
     borderTopWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   }
 });

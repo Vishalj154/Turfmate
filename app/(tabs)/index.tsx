@@ -141,17 +141,34 @@ export default function HomeScreen() {
     </Card>
   );
 
+  const getGreeting = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 12) {
+      return 'Good morning';
+    } else if (hour < 17) {
+      return 'Good afternoon';
+    } else {
+      return 'Good evening';
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={[styles.avatar, { backgroundColor: themeColors.primary }]}>
+            <TouchableOpacity 
+              style={[styles.avatar, { backgroundColor: themeColors.primary }]}
+              onPress={() => router.push('/(tabs)/profile')}
+              activeOpacity={0.7}
+            >
               <Text color={Colors.light.surface} weight="bold">{user?.name?.charAt(0) || 'G'}</Text>
-            </View>
+            </TouchableOpacity>
             <View>
-              <Text variant="caption" color={themeColors.textSecondary}>Good evening, {user?.name?.split(' ')[0] || 'Guest'} 👋</Text>
+              <Text variant="caption" color={themeColors.textSecondary}>
+                {getGreeting()}, {user?.name?.split(' ')[0] || 'Guest'} 👋
+              </Text>
               <TouchableOpacity style={styles.locationContainer} onPress={handleLocationPress} activeOpacity={0.7}>
                 <Ionicons name="location-sharp" size={14} color={location ? '#2E7D32' : themeColors.primary} />
                 <Text variant="body" weight="medium" style={{ marginLeft: 2 }}>
