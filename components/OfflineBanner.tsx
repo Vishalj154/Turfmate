@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from './ui/Text';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -7,6 +8,7 @@ import { Colors, Spacing } from '../theme';
 
 export const OfflineBanner: React.FC = () => {
   const { isOnline } = useNetworkStatus();
+  const insets = useSafeAreaInsets();
   const [showRestored, setShowRestored] = useState<boolean>(false);
   const wasOffline = useRef<boolean>(false);
   const slideAnim = useRef(new Animated.Value(-50)).current;
@@ -63,7 +65,11 @@ export const OfflineBanner: React.FC = () => {
     <Animated.View
       style={[
         styles.banner,
-        { backgroundColor, transform: [{ translateY: slideAnim }] },
+        {
+          backgroundColor,
+          paddingTop: insets.top + 4,
+          transform: [{ translateY: slideAnim }],
+        },
       ]}
     >
       <Ionicons name={iconName as any} size={16} color="#FFFFFF" style={styles.icon} />

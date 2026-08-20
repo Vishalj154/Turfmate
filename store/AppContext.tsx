@@ -61,7 +61,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           const profile = await getUserProfile(fbUser.uid);
           const u: User = {
-            id: profile?.id || fbUser.uid,
+            // IMPORTANT: Always use fbUser.uid as the authoritative ID.
+            // profile?.id may be a legacy/sample field (e.g. "user_101") that does NOT
+            // match request.auth.uid in Firestore security rules, causing "Permission denied".
+            id: fbUser.uid,
             name: profile?.name || fbUser.displayName || 'TurfMate User',
             email: profile?.email || fbUser.email || '',
             phone: profile?.phone || fbUser.phoneNumber || '',

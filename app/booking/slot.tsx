@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Button } from '../../components/ui/Button';
 import { Colors, Spacing, BorderRadius } from '../../theme';
@@ -38,6 +38,7 @@ export default function SlotSelectionScreen() {
   const router = useRouter();
   const { isDark } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
 
   const [venue, setVenue] = useState<UIVenue | null>(null);
   const [bookedStartTimes, setBookedStartTimes] = useState<string[]>([]);
@@ -177,9 +178,9 @@ export default function SlotSelectionScreen() {
         </ScrollView>
       )}
 
-      <View style={[styles.bottomBar, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border }]}>
+      <View style={[styles.bottomBar, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border, paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
         <Button 
-          title="Review Booking" 
+          title="Continue" 
           size="lg" 
           disabled={!selectedSlot || loading}
           onPress={() => {
@@ -243,7 +244,6 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     padding: Spacing.lg,
-    paddingBottom: 30, // Safe area
     borderTopWidth: 1,
   }
 });

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Button } from '../../components/ui/Button';
 import { Colors, Spacing, BorderRadius } from '../../theme';
@@ -22,6 +22,7 @@ export default function DateSelectionScreen() {
   const router = useRouter();
   const { isDark } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
 
   // Generate 14 upcoming days starting from Today
   const upcomingDates = React.useMemo(() => {
@@ -102,9 +103,9 @@ export default function DateSelectionScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.bottomBar, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border }]}>
+      <View style={[styles.bottomBar, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border, paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
         <Button 
-          title="Continue to Time Slots" 
+          title="Continue" 
           size="lg" 
           onPress={() => router.push(`/booking/slot?venueId=${venueId}&date=${encodeURIComponent(selectedDate.fullDate)}&displayDate=${encodeURIComponent(selectedDate.displayDate)}`)}
           style={{ flex: 1 }}
@@ -153,7 +154,6 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     padding: Spacing.lg,
-    paddingBottom: 30, // Safe area
     borderTopWidth: 1,
   }
 });
