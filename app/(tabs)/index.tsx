@@ -35,7 +35,6 @@ export default function HomeScreen() {
     location,
     permissionState,
     loading: locationLoading,
-    error: locationError,
     requestLocation,
   } = useUserLocation();
 
@@ -182,10 +181,19 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          <TouchableOpacity style={[styles.iconButton, { backgroundColor: themeColors.surface }]}>
-            <Ionicons name="notifications-outline" size={24} color={themeColors.textPrimary} />
-            <View style={styles.badge} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={[styles.iconButton, { backgroundColor: themeColors.surface, marginRight: Spacing.xs }]}
+              onPress={() => router.push('/map')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="map-outline" size={22} color={themeColors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.iconButton, { backgroundColor: themeColors.surface }]}>
+              <Ionicons name="notifications-outline" size={24} color={themeColors.textPrimary} />
+              <View style={styles.badge} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search Bar */}
@@ -195,9 +203,12 @@ export default function HomeScreen() {
         >
           <Ionicons name="search" size={20} color={themeColors.textSecondary} />
           <Text style={[styles.searchText, { color: themeColors.textSecondary }]}>Search turfs, resorts, venues...</Text>
-          <View style={[styles.filterIcon, { backgroundColor: themeColors.primary }]}>
-            <Ionicons name="options-outline" size={20} color={Colors.light.surface} />
-          </View>
+          <TouchableOpacity 
+            style={[styles.filterIcon, { backgroundColor: themeColors.primary }]}
+            onPress={() => router.push('/map')}
+          >
+            <Ionicons name="map-outline" size={20} color={Colors.light.surface} />
+          </TouchableOpacity>
         </TouchableOpacity>
 
         {/* Banner Carousel */}

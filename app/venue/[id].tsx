@@ -118,10 +118,19 @@ export default function VenueDetailsScreen() {
 
           <View style={styles.section}>
             <Text variant="h3" style={styles.sectionTitle}>Location</Text>
-            <View style={[styles.mapPlaceholder, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-              <Ionicons name="map-outline" size={40} color={themeColors.textSecondary} />
-              <Text variant="body" color={themeColors.textSecondary} style={{ marginTop: Spacing.sm }}>Map View</Text>
-            </View>
+            <TouchableOpacity
+              style={[styles.mapPlaceholder, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
+              onPress={() => router.push(`/map?venueId=${venue.id}${venue.latitude ? `&lat=${venue.latitude}&lng=${venue.longitude}` : ''}`)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="map-outline" size={36} color={themeColors.primary} />
+              <Text variant="body" weight="bold" color={themeColors.primary} style={{ marginTop: Spacing.xs }}>
+                View on Interactive Map
+              </Text>
+              <Text variant="caption" color={themeColors.textSecondary}>
+                Tap to explore turf location & directions
+              </Text>
+            </TouchableOpacity>
             <Text variant="caption" color={themeColors.textSecondary} style={{ marginTop: Spacing.sm }}>
               {venue.location}
             </Text>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../components/ui/Text';
 import { Card } from '../components/ui/Card';
@@ -92,6 +92,12 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
         </View>
+        <TouchableOpacity 
+          style={[styles.mapHeaderButton, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
+          onPress={() => router.push('/map')}
+        >
+          <Ionicons name="map-outline" size={22} color={themeColors.primary} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -118,7 +124,16 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: Spacing.xs,
-    marginRight: Spacing.sm,
+    marginRight: Spacing.xs,
+  },
+  mapHeaderButton: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: Spacing.xs,
+    borderWidth: 1,
   },
   searchBar: {
     flex: 1,
