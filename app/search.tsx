@@ -94,7 +94,7 @@ export default function SearchScreen() {
         </View>
         <TouchableOpacity 
           style={[styles.mapHeaderButton, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
-          onPress={() => router.push('/map')}
+          onPress={() => router.push({ pathname: '/map' })}
         >
           <Ionicons name="map-outline" size={22} color={themeColors.primary} />
         </TouchableOpacity>

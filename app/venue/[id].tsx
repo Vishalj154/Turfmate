@@ -120,7 +120,13 @@ export default function VenueDetailsScreen() {
             <Text variant="h3" style={styles.sectionTitle}>Location</Text>
             <TouchableOpacity
               style={[styles.mapPlaceholder, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
-              onPress={() => router.push(`/map?venueId=${venue.id}${venue.latitude ? `&lat=${venue.latitude}&lng=${venue.longitude}` : ''}`)}
+              onPress={() => router.push({
+                pathname: '/map',
+                params: {
+                  venueId: venue.id,
+                  ...(venue.latitude ? { lat: String(venue.latitude), lng: String(venue.longitude) } : {})
+                }
+              })}
               activeOpacity={0.7}
             >
               <Ionicons name="map-outline" size={36} color={themeColors.primary} />

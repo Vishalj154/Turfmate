@@ -184,7 +184,7 @@ export default function HomeScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity 
               style={[styles.iconButton, { backgroundColor: themeColors.surface, marginRight: Spacing.xs }]}
-              onPress={() => router.push('/map')}
+              onPress={() => router.push({ pathname: '/map' })}
               activeOpacity={0.7}
             >
               <Ionicons name="map-outline" size={22} color={themeColors.primary} />
@@ -205,7 +205,7 @@ export default function HomeScreen() {
           <Text style={[styles.searchText, { color: themeColors.textSecondary }]}>Search turfs, resorts, venues...</Text>
           <TouchableOpacity 
             style={[styles.filterIcon, { backgroundColor: themeColors.primary }]}
-            onPress={() => router.push('/map')}
+            onPress={() => router.push({ pathname: '/map' })}
           >
             <Ionicons name="map-outline" size={20} color={Colors.light.surface} />
           </TouchableOpacity>
