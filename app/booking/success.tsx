@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
@@ -48,8 +48,17 @@ export default function BookingSuccessScreen() {
         </Text>
 
         <Card style={styles.detailsCard}>
-          <Text variant="caption" color={themeColors.textSecondary} style={{ marginBottom: 4 }}>Venue</Text>
-          <Text variant="h3" style={{ marginBottom: Spacing.md }}>{venue?.name || 'Turf Venue'}</Text>
+          <View style={styles.venueRow}>
+            <Image 
+              source={{ uri: venue?.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800' }} 
+              style={styles.venueImage} 
+            />
+            <View style={styles.venueInfo}>
+              <Text variant="caption" color={themeColors.textSecondary}>Venue</Text>
+              <Text variant="h3" numberOfLines={1}>{venue?.name || 'Turf Venue'}</Text>
+              <Text variant="caption" color={themeColors.primary} weight="bold">{venue?.location || 'Navi Mumbai'}</Text>
+            </View>
+          </View>
 
           <View style={styles.row}>
             <View style={styles.col}>
@@ -127,6 +136,20 @@ const styles = StyleSheet.create({
     width: '100%',
     padding: Spacing.lg,
     marginBottom: Spacing.xl,
+  },
+  venueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  venueImage: {
+    width: 54,
+    height: 54,
+    borderRadius: BorderRadius.md,
+    marginRight: Spacing.md,
+  },
+  venueInfo: {
+    flex: 1,
   },
   row: {
     flexDirection: 'row',

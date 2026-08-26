@@ -7,10 +7,10 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Venue rules (Public read for authenticated users, write restricted to owner/admin)
+    // Venue rules (Public read for browsing, write restricted to authenticated users)
     match /venues/{venueId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
     // Booking rules (Read/update restricted to booking owner, create requires auth UID match)
@@ -20,9 +20,9 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
-    // TimeSlots rules (Read for authenticated users, create/update via atomic booking)
+    // TimeSlots rules (Read for all users to check availability, create/update for authenticated users)
     match /timeSlots/{slotId} {
-      allow read: if request.auth != null;
+      allow read: if true;
       allow create, update: if request.auth != null;
     }
   }

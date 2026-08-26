@@ -8,8 +8,10 @@ import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { getTurfByIdFromFirestore } from '../../services/turfService';
+import { getTurfByIdFromFirestore, mapSchemaToUIVenue } from '../../services/turfService';
 import { cancelBookingInFirestore } from '../../services/bookingService';
+import { getLocalVenues } from '../../database/localDatabase';
+import { sampleVenues } from '../../database/sampleData';
 import { Venue as UIVenue } from '../../types';
 
 const TABS = ['Upcoming', 'Completed', 'Cancelled'];
@@ -31,6 +33,27 @@ export default function BookingsScreen() {
       const newCache = { ...venueCache };
       let updated = false;
 
+      // 1. Populate from local SQLite database and sample data first for instant image loading
+      try {
+        const local = await getLocalVenues();
+        for (const lv of local) {
+          if (lv.id && !newCache[lv.id]) {
+            newCache[lv.id] = lv;
+            updated = true;
+          }
+        }
+      } catch (err) {
+        console.warn('Error reading local SQLite venues:', err);
+      }
+
+      for (const sv of sampleVenues) {
+        if (!newCache[sv.id]) {
+          newCache[sv.id] = mapSchemaToUIVenue(sv);
+          updated = true;
+        }
+      }
+
+      // 2. Fetch any remaining missing venues from Firestore
       for (const b of bookings) {
         if (!newCache[b.venueId]) {
           try {
@@ -50,9 +73,7 @@ export default function BookingsScreen() {
       }
     }
 
-    if (bookings.length > 0) {
-      fetchVenuesForBookings();
-    }
+    fetchVenuesForBookings();
   }, [bookings]);
 
   const handleRefresh = async () => {

@@ -1,8 +1,11 @@
-import { initializeApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, setLogLevel } from "firebase/app";
+import { initializeAuth, getAuth, getReactNativePersistence } from "firebase/auth";
+import { initializeFirestore, getFirestore, persistentLocalCache } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Suppress internal Firebase verbose logging during offline transitions
+setLogLevel('error');
 
 const firebaseConfig = {
   apiKey: "AIzaSyDmS8B89bHV-V3y7_IgjEw1j4Aq3ubY3Ns",
@@ -13,14 +16,30 @@ const firebaseConfig = {
   appId: "1:122831017806:web:720608e7fe79b04d73301f"
 };
 
-const app = initializeApp(firebaseConfig);
+// Singleton App initialization to prevent duplicate app creation on Fast Refresh
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// Safe Auth initialization with AsyncStorage persistence and Fast Refresh protection
+let auth: ReturnType<typeof getAuth>;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+} catch {
+  auth = getAuth(app);
+}
 
-export const db = getFirestore(app);
+// Safe Firestore initialization with persistent local cache
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({})
+  });
+} catch {
+  db = getFirestore(app);
+}
 
-export const storage = getStorage(app);
+const storage = getStorage(app);
 
+export { app, auth, db, storage };
 export default app;

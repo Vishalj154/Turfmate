@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Card } from '../../components/ui/Card';
@@ -14,15 +14,17 @@ import { useUserLocation } from '../../hooks/useUserLocation';
 import { calculateDistance } from '../../services/locationService';
 
 const CATEGORIES = [
-  { id: '1', name: 'Cricket', icon: 'baseball-outline' },
-  { id: '2', name: 'Football', icon: 'football-outline' },
-  { id: '3', name: 'Badminton', icon: 'tennisball-outline' },
-  { id: '4', name: 'Swimming', icon: 'water-outline' },
-  { id: '5', name: 'Tennis', icon: 'tennisball-outline' },
+  { id: 'all', name: 'All', icon: 'grid-outline' },
+  { id: 'cricket', name: 'Cricket', icon: 'baseball-outline' },
+  { id: 'football', name: 'Football', icon: 'football-outline' },
+  { id: 'badminton', name: 'Badminton', icon: 'tennisball-outline' },
+  { id: 'tennis', name: 'Tennis', icon: 'tennisball-outline' },
+  { id: 'swimming', name: 'Swimming', icon: 'water-outline' },
+  { id: 'resorts', name: 'Resorts', icon: 'bed-outline' },
 ];
 
 export default function HomeScreen() {
-  const { isDark, user, isFavorite, toggleFavorite } = useApp();
+  const { isDark, user, isFavorite, toggleFavorite, notifications, markNotificationRead } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
   const router = useRouter();
 
@@ -30,6 +32,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [sortByNearest, setSortByNearest] = useState<boolean>(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showNotifications, setShowNotifications] = useState<boolean>(false);
 
   const {
     location,
@@ -46,7 +50,7 @@ export default function HomeScreen() {
       setAllVenues(data);
     } catch (err: any) {
       console.error('Error fetching turfs:', err);
-      setError('Unable to load turfs right now. Please try again.');
+      setError('Unable to load turfs right now. Using offline cached listings.');
     } finally {
       setLoading(false);
     }
@@ -70,17 +74,41 @@ export default function HomeScreen() {
     });
   }, [allVenues, location]);
 
-  const turfs = useMemo(() => {
-    const list = processedVenues.filter((v) => v.type === 'Turf' || v.type === 'Sports Venue');
+  const filteredVenues = useMemo(() => {
+    let list = processedVenues;
+
+    if (selectedCategory !== 'all') {
+      if (selectedCategory === 'resorts') {
+        list = list.filter((v) => v.type === 'Resort');
+      } else {
+        const target = selectedCategory.toLowerCase();
+        list = list.filter((v) =>
+          v.sports?.some((s) => s.toLowerCase().includes(target)) ||
+          v.type?.toLowerCase().includes(target) ||
+          v.name.toLowerCase().includes(target) ||
+          v.description.toLowerCase().includes(target)
+        );
+      }
+    }
+
     if (sortByNearest && location) {
       return [...list].sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
     }
+
     return list;
-  }, [processedVenues, sortByNearest, location]);
+  }, [processedVenues, selectedCategory, sortByNearest, location]);
+
+  const turfs = useMemo(() => {
+    if (selectedCategory === 'resorts') {
+      return filteredVenues;
+    }
+    return filteredVenues.filter((v) => v.type !== 'Resort');
+  }, [filteredVenues, selectedCategory]);
 
   const resorts = useMemo(() => {
-    return processedVenues.filter((v) => v.type === 'Resort');
-  }, [processedVenues]);
+    if (selectedCategory === 'resorts') return [];
+    return filteredVenues.filter((v) => v.type === 'Resort');
+  }, [filteredVenues, selectedCategory]);
 
   const handleLocationPress = async () => {
     if (permissionState === 'granted' && location) {
@@ -94,11 +122,22 @@ export default function HomeScreen() {
       if (!coords && permissionState === 'denied') {
         Alert.alert(
           'Location Access Required',
-          'Location permission allows TurfMate to show nearby turfs and precise distances. Standard listings are displayed.',
+          'Location permission allows TurfMate to show nearby turfs and precise distances.',
           [{ text: 'OK' }]
         );
       }
     }
+  };
+
+  const handleBannerPress = () => {
+    Alert.alert(
+      '🎉 Special Offer Activated!',
+      'Use promo code WELCOME20 at checkout for 20% OFF on all weekend bookings!',
+      [
+        { text: 'Explore Turfs', onPress: () => router.push('/search') },
+        { text: 'OK' }
+      ]
+    );
   };
 
   const renderVenueCard = ({ item }: { item: any }) => (
@@ -130,7 +169,7 @@ export default function HomeScreen() {
         </Text>
         <View style={styles.venueFooter}>
           <Text variant="body" weight="bold" color={themeColors.primary}>
-            ₹{item.pricePerHour}<Text variant="caption">/hr</Text>
+            ₹{item.pricePerHour}<Text variant="caption">/{item.type === 'Resort' ? 'night' : 'hr'}</Text>
           </Text>
           <View style={styles.bookButton}>
             <Text variant="caption" weight="bold" color={Colors.light.surface}>Book Now</Text>
@@ -142,14 +181,12 @@ export default function HomeScreen() {
 
   const getGreeting = (): string => {
     const hour = new Date().getHours();
-    if (hour < 12) {
-      return 'Good morning';
-    } else if (hour < 17) {
-      return 'Good afternoon';
-    } else {
-      return 'Good evening';
-    }
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   };
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top']}>
@@ -189,9 +226,13 @@ export default function HomeScreen() {
             >
               <Ionicons name="map-outline" size={22} color={themeColors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconButton, { backgroundColor: themeColors.surface }]}>
+            <TouchableOpacity 
+              style={[styles.iconButton, { backgroundColor: themeColors.surface }]}
+              onPress={() => setShowNotifications(true)}
+              activeOpacity={0.7}
+            >
               <Ionicons name="notifications-outline" size={24} color={themeColors.textPrimary} />
-              <View style={styles.badge} />
+              {unreadCount > 0 && <View style={styles.badge} />}
             </TouchableOpacity>
           </View>
         </View>
@@ -200,6 +241,7 @@ export default function HomeScreen() {
         <TouchableOpacity 
           style={[styles.searchBar, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
           onPress={() => router.push('/search')}
+          activeOpacity={0.8}
         >
           <Ionicons name="search" size={20} color={themeColors.textSecondary} />
           <Text style={[styles.searchText, { color: themeColors.textSecondary }]}>Search turfs, resorts, venues...</Text>
@@ -211,34 +253,88 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
 
-        {/* Banner Carousel */}
-        <View style={styles.bannerContainer}>
-          <Card style={[styles.banner, { backgroundColor: themeColors.primary }]}>
-            <View style={styles.bannerContent}>
-              <Text variant="h2" color={Colors.light.surface}>Flat 20% Off</Text>
-              <Text variant="body" color={Colors.light.surface} style={{ opacity: 0.9, marginTop: 4 }}>On Weekend Bookings</Text>
+        {/* Weather Playability Widget */}
+        <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+          <Card style={[styles.weatherWidget, { backgroundColor: isDark ? '#1E293B' : '#ECFDF5', borderColor: isDark ? '#334155' : '#A7F3D0' }]}>
+            <View style={styles.weatherHeader}>
+              <Ionicons name="sunny" size={28} color="#F59E0B" />
+              <View style={{ marginLeft: Spacing.sm, flex: 1 }}>
+                <Text variant="body" weight="bold" color={isDark ? '#F8FAFC' : '#065F46'}>
+                  ☀️ Clear Skies • 28°C
+                </Text>
+                <Text variant="caption" color={isDark ? '#94A3B8' : '#047857'}>
+                  Ideal weather for Football & Box Cricket in Navi Mumbai!
+                </Text>
+              </View>
+              <View style={styles.playabilityBadge}>
+                <Text variant="caption" weight="bold" color="#FFFFFF">Ideal</Text>
+              </View>
             </View>
-            <Ionicons name="ticket-outline" size={60} color="rgba(255,255,255,0.2)" style={styles.bannerIcon} />
           </Card>
         </View>
 
-        {/* Categories */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-          {CATEGORIES.map(cat => (
-            <TouchableOpacity key={cat.id} style={styles.categoryItem}>
-              <View style={[styles.categoryIcon, { backgroundColor: themeColors.surface }]}>
-                <Ionicons name={cat.icon as any} size={24} color={themeColors.primary} />
+        {/* Offer Banner */}
+        <View style={styles.bannerContainer}>
+          <TouchableOpacity activeOpacity={0.9} onPress={handleBannerPress}>
+            <Card style={[styles.banner, { backgroundColor: themeColors.primary }]}>
+              <View style={styles.bannerContent}>
+                <Text variant="h2" color={Colors.light.surface}>Flat 20% Off</Text>
+                <Text variant="body" color={Colors.light.surface} style={{ opacity: 0.9, marginTop: 4 }}>
+                  Use code WELCOME20 on weekend bookings
+                </Text>
               </View>
-              <Text variant="caption" style={{ marginTop: Spacing.xs }}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              <Ionicons name="ticket-outline" size={60} color="rgba(255,255,255,0.2)" style={styles.bannerIcon} />
+            </Card>
+          </TouchableOpacity>
+        </View>
+
+        {/* Categories / Sports Filter Icons */}
+        <View style={{ marginBottom: Spacing.xl }}>
+          <Text variant="h3" style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm }}>
+            Browse Sports & Categories
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
+            {CATEGORIES.map(cat => {
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <TouchableOpacity 
+                  key={cat.id} 
+                  style={styles.categoryItem}
+                  onPress={() => setSelectedCategory(cat.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[
+                    styles.categoryIcon, 
+                    { backgroundColor: isSelected ? themeColors.primary : themeColors.surface },
+                    isSelected && { shadowColor: themeColors.primary, shadowRadius: 6, shadowOpacity: 0.3 }
+                  ]}>
+                    <Ionicons 
+                      name={cat.icon as any} 
+                      size={24} 
+                      color={isSelected ? Colors.light.surface : themeColors.primary} 
+                    />
+                  </View>
+                  <Text 
+                    variant="caption" 
+                    weight={isSelected ? 'bold' : 'regular'}
+                    color={isSelected ? themeColors.primary : themeColors.textPrimary}
+                    style={{ marginTop: Spacing.xs }}
+                  >
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         {/* Popular Turfs */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <Text variant="h3">Popular Turfs</Text>
+              <Text variant="h3">
+                {selectedCategory === 'all' ? 'Popular Turfs' : `${selectedCategory.toUpperCase()} Venues`}
+              </Text>
               {location && (
                 <TouchableOpacity
                   style={[
@@ -263,10 +359,11 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <TouchableOpacity onPress={() => router.push('/search')}>
+            <TouchableOpacity onPress={() => router.push({ pathname: '/search', params: { category: selectedCategory } })}>
               <Text variant="button" color={themeColors.primary}>See All</Text>
             </TouchableOpacity>
           </View>
+
           {loading ? (
             <View style={{ padding: Spacing.xl, alignItems: 'center' }}>
               <ActivityIndicator size="large" color={themeColors.primary} />
@@ -278,7 +375,14 @@ export default function HomeScreen() {
             </View>
           ) : turfs.length === 0 ? (
             <View style={{ padding: Spacing.lg, alignItems: 'center' }}>
-              <Text variant="body" color={themeColors.textSecondary}>No turfs available right now.</Text>
+              <Text variant="body" color={themeColors.textSecondary}>No venues match "{selectedCategory}".</Text>
+              <Button 
+                title="Clear Filter" 
+                size="sm" 
+                variant="outline" 
+                onPress={() => setSelectedCategory('all')} 
+                style={{ marginTop: Spacing.sm }}
+              />
             </View>
           ) : (
             <FlatList
@@ -292,26 +396,77 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Premium Resorts */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text variant="h3">Premium Resorts</Text>
-            <TouchableOpacity onPress={() => router.push('/search')}>
-              <Text variant="button" color={themeColors.primary}>See All</Text>
-            </TouchableOpacity>
+        {/* Premium Resorts Section */}
+        {resorts.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text variant="h3">Premium Resorts & Weekend Retreats</Text>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/search', params: { type: 'Resort' } })}>
+                <Text variant="button" color={themeColors.primary}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={resorts}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={item => item.id}
+              renderItem={renderVenueCard}
+              contentContainerStyle={styles.listContent}
+            />
           </View>
-          <FlatList
-            data={resorts}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={item => item.id}
-            renderItem={renderVenueCard}
-            contentContainerStyle={styles.listContent}
-          />
-        </View>
+        )}
         
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
+
+      {/* Notifications Drawer Modal */}
+      <Modal
+        visible={showNotifications}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowNotifications(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowNotifications(false)}
+        >
+          <View style={[styles.notificationsDrawer, { backgroundColor: themeColors.surface }]}>
+            <View style={styles.drawerHeader}>
+              <Text variant="h2">Notifications</Text>
+              <TouchableOpacity onPress={() => setShowNotifications(false)}>
+                <Ionicons name="close" size={24} color={themeColors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {notifications.map(n => (
+                <TouchableOpacity 
+                  key={n.id}
+                  style={[
+                    styles.notificationItem, 
+                    { borderBottomColor: themeColors.border },
+                    !n.isRead && { backgroundColor: themeColors.primary + '10' }
+                  ]}
+                  onPress={() => markNotificationRead(n.id)}
+                >
+                  <View style={[styles.notifIcon, { backgroundColor: themeColors.primary + '20' }]}>
+                    <Ionicons 
+                      name={n.type === 'Booking' ? 'calendar' : n.type === 'Offer' ? 'pricetag' : 'notifications'} 
+                      size={20} 
+                      color={themeColors.primary} 
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <Text variant="body" weight="bold">{n.title}</Text>
+                    <Text variant="caption" color={themeColors.textSecondary} style={{ marginTop: 2 }}>{n.message}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -494,5 +649,50 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: BorderRadius.round,
     marginLeft: 4,
+  },
+  weatherWidget: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  weatherHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  playabilityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: '#10B981',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  notificationsDrawer: {
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    maxHeight: '80%',
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  notifIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   }
 });

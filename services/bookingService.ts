@@ -218,6 +218,14 @@ export const cancelBookingInFirestore = async (bookingId: string, userId: string
       }
     });
 
+    // Update local SQLite booking status
+    try {
+      const { updateLocalBookingStatus } = await import('../database/localDatabase');
+      await updateLocalBookingStatus(bookingId, 'Cancelled');
+    } catch (e) {
+      console.warn('Could not update local SQLite booking status:', e);
+    }
+
     return true;
   } catch (error) {
     console.error('Error cancelling booking:', error);

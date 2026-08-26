@@ -151,7 +151,7 @@ export default function VenueDetailsScreen() {
       <View style={[styles.bottomBar, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border }]}>
         <View>
           <Text variant="h3" color={themeColors.primary}>₹{venue.pricePerHour}</Text>
-          <Text variant="caption" color={themeColors.textSecondary}>per hour</Text>
+          <Text variant="caption" color={themeColors.textSecondary}>per {venue.type === 'Resort' ? 'night' : 'hour'}</Text>
         </View>
         <Button 
           title="Book Now" 

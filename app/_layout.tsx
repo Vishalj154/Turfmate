@@ -3,9 +3,16 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { AppProvider, useApp } from '../store/AppContext';
-import { ActivityIndicator, View } from 'react-native';
+import { LogBox, ActivityIndicator, View } from 'react-native';
 import { Colors } from '../theme';
 import { OfflineBanner } from '../components/OfflineBanner';
+
+// Suppress Firestore background offline connection warnings in dev LogBox
+LogBox.ignoreLogs([
+  'Could not reach Cloud Firestore backend',
+  'Backend didn\'t respond within 10 seconds',
+  '@firebase/firestore'
+]);
 
 // Wrapper component to handle routing logic based on state
 const RootNavigation = () => {
@@ -59,6 +66,7 @@ const RootNavigation = () => {
         <Stack.Screen name="booking/success" />
         <Stack.Screen name="booking/detail" />
         <Stack.Screen name="search" />
+        <Stack.Screen name="map" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="support" />
         <Stack.Screen name="terms" />

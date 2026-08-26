@@ -6,6 +6,9 @@ import { subscribeToAuthState } from '../services/authStateService';
 import { logoutUser } from '../services/authService';
 import { getUserProfile } from '../services/userService';
 
+import { initializeAndSyncData, saveBookingDual } from '../services/syncService';
+import { saveLocalFavorite, removeLocalFavorite, getLocalFavorites } from '../database/localDatabase';
+
 type ThemeMode = 'light' | 'dark' | 'system';
 
 interface AppContextType {
@@ -37,33 +40,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [favorites, setFavorites] = useState<string[]>(['venue_001']);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
 
   const isDark = themeMode === 'system' ? systemColorScheme === 'dark' : themeMode === 'dark';
 
-  const refreshBookings = async () => {
-    if (user && user.id && user.id !== 'guest') {
-      try {
-        const { getUserBookingsFromFirestore } = await import('../services/bookingService');
-        const userBkgs = await getUserBookingsFromFirestore(user.id);
-        setBookings(userBkgs);
-      } catch (err) {
-        console.error('Error in refreshBookings:', err);
+  // Initialize SQLite database and sync with Firestore on mount after auth state is resolved
+  useEffect(() => {
+    if (authLoading) return;
+
+    initializeAndSyncData(user?.id).then(({ bookings: syncedBookings }) => {
+      if (syncedBookings) {
+        setBookings(syncedBookings);
       }
-    }
+    }).catch(err => {
+      console.error('[AppContext] Error in initial database sync:', err);
+    });
+  }, [user?.id, authLoading]);
+
+  const refreshBookings = async () => {
+    const userId = user?.id || 'guest';
+    const { bookings: updatedBkgs } = await initializeAndSyncData(userId);
+    setBookings(updatedBkgs);
   };
 
   useEffect(() => {
+    // Fallback timeout to prevent blank screen if Firebase auth is slow/offline
+    const safetyTimer = setTimeout(() => {
+      setAuthLoading(false);
+    }, 2500);
+
     const unsubscribe = subscribeToAuthState(async (fbUser) => {
+      clearTimeout(safetyTimer);
       if (fbUser) {
         try {
           const profile = await getUserProfile(fbUser.uid);
           const u: User = {
-            // IMPORTANT: Always use fbUser.uid as the authoritative ID.
-            // profile?.id may be a legacy/sample field (e.g. "user_101") that does NOT
-            // match request.auth.uid in Firestore security rules, causing "Permission denied".
             id: fbUser.uid,
             name: profile?.name || fbUser.displayName || 'TurfMate User',
             email: profile?.email || fbUser.email || '',
@@ -73,13 +86,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
           setUser(u);
 
-          // Fetch user's bookings from Firestore
           try {
-            const { getUserBookingsFromFirestore } = await import('../services/bookingService');
-            const userBkgs = await getUserBookingsFromFirestore(u.id);
-            setBookings(userBkgs);
+            const favs = await getLocalFavorites(u.id);
+            if (favs && favs.length > 0) setFavorites(favs);
           } catch (e) {
-            console.error('Error fetching initial user bookings:', e);
+            console.error('Error fetching local favorites:', e);
           }
         } catch {
           setUser({
@@ -98,7 +109,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAuthLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubscribe();
+    };
   }, []);
 
   const login = (asGuest = false) => {
@@ -127,15 +141,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleFavorite = (venueId: string) => {
-    setFavorites(prev => 
-      prev.includes(venueId) ? prev.filter(id => id !== venueId) : [...prev, venueId]
-    );
+    const userId = user?.id || 'guest';
+    setFavorites(prev => {
+      const exists = prev.includes(venueId);
+      if (exists) {
+        removeLocalFavorite(userId, venueId);
+        return prev.filter(id => id !== venueId);
+      } else {
+        saveLocalFavorite(userId, venueId);
+        return [...prev, venueId];
+      }
+    });
   };
 
   const isFavorite = (venueId: string) => favorites.includes(venueId);
 
   const addBooking = (booking: Booking) => {
+    const userId = user?.id || 'guest';
     setBookings(prev => [booking, ...prev]);
+    saveBookingDual(booking, userId);
   };
 
   const markNotificationRead = (id: string) => {
