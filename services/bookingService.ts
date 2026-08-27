@@ -119,10 +119,26 @@ export const createBookingAtomic = async (params: CreateBookingParams): Promise<
  * Query booked slot IDs/timeStrings for a given venue and date.
  */
 export const getBookedSlotsForVenueAndDate = async (venueId: string, date: string): Promise<string[]> => {
-  try {
-    const normalizedVenueId = venueId.trim();
-    const normalizedDate = date.trim();
+  const bookedTimes: Set<string> = new Set();
+  const normalizedVenueId = venueId.trim();
+  const normalizedDate = date.trim();
 
+  // 1. Check local SQLite bookings first (instant offline check)
+  try {
+    const { getLocalBookings } = await import('../database/localDatabase');
+    const local = await getLocalBookings();
+    local.forEach(b => {
+      if (b.venueId === normalizedVenueId && b.date === normalizedDate && b.status !== 'Cancelled') {
+        const start = b.timeSlot.split(' - ')[0]?.trim().toUpperCase();
+        if (start) bookedTimes.add(start);
+      }
+    });
+  } catch (e) {
+    // Ignore local SQLite errors
+  }
+
+  // 2. Query Cloud Firestore timeSlots
+  try {
     const timeSlotsRef = collection(db, 'timeSlots');
     const q = query(
       timeSlotsRef,
@@ -132,19 +148,17 @@ export const getBookedSlotsForVenueAndDate = async (venueId: string, date: strin
     );
     const snapshot = await getDocs(q);
 
-    const bookedTimes: string[] = [];
     snapshot.forEach((dSnap) => {
       const data = dSnap.data();
       if (data.startTime) {
-        bookedTimes.push(data.startTime.trim().toUpperCase());
+        bookedTimes.add(data.startTime.trim().toUpperCase());
       }
     });
-
-    return bookedTimes;
   } catch (error) {
-    console.error('Error fetching booked slots:', error);
-    return [];
+    console.warn('Could not query Firestore timeSlots, using local booked slots:', error);
   }
+
+  return Array.from(bookedTimes);
 };
 
 /**
