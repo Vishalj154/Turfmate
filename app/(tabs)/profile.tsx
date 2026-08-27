@@ -1,17 +1,41 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Switch, Share, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Switch, Share, Alert, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
 import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
 import { Colors, Spacing, BorderRadius } from '../../theme';
 import { useApp } from '../../store/AppContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { getRawDatabaseDump } from '../../database/localDatabase';
 
 export default function ProfileScreen() {
   const { isDark, user, logout, themeMode, setThemeMode } = useApp();
   const themeColors = isDark ? Colors.dark : Colors.light;
   const router = useRouter();
+
+  const [showDbModal, setShowDbModal] = useState<boolean>(false);
+  const [loadingDb, setLoadingDb] = useState<boolean>(false);
+  const [dbData, setDbData] = useState<{
+    users: any[];
+    bookings: any[];
+    favorites: any[];
+    venuesCount: number;
+  } | null>(null);
+
+  const handleOpenDatabaseInspector = async () => {
+    setLoadingDb(true);
+    setShowDbModal(true);
+    try {
+      const dump = await getRawDatabaseDump();
+      setDbData(dump);
+    } catch (e) {
+      console.error('Error opening DB dump:', e);
+    } finally {
+      setLoadingDb(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -90,6 +114,18 @@ export default function ProfileScreen() {
           </Card>
 
           <View style={styles.section}>
+            <Text variant="h3" style={styles.sectionTitle}>Lab & Database Tools</Text>
+            <Card style={{ padding: 0 }}>
+              <MenuItem 
+                icon="server-outline" 
+                title="View Local SQLite Database" 
+                value="turfmate.db"
+                onPress={handleOpenDatabaseInspector} 
+              />
+            </Card>
+          </View>
+
+          <View style={styles.section}>
             <Text variant="h3" style={styles.sectionTitle}>Preferences</Text>
             <Card style={{ padding: 0 }}>
               <MenuItem 
@@ -161,6 +197,81 @@ export default function ProfileScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Database Inspector Modal */}
+      <Modal visible={showDbModal} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.background }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text variant="h2">🗄️ SQLite Database</Text>
+                <Text variant="caption" color={themeColors.textSecondary}>File: turfmate.db</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDbModal(false)} style={styles.closeBtn}>
+                <Ionicons name="close-circle" size={28} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {loadingDb ? (
+              <ActivityIndicator size="large" color={themeColors.primary} style={{ marginTop: 40 }} />
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: Spacing.md }}>
+                {/* USERS TABLE */}
+                <View style={styles.tableHeaderRow}>
+                  <Text variant="h3">👤 Table: users ({dbData?.users.length || 0})</Text>
+                </View>
+                {dbData?.users && dbData.users.length > 0 ? (
+                  dbData.users.map((u, idx) => (
+                    <Card key={u.id || idx} style={styles.dbRowCard}>
+                      <Text variant="body" weight="bold">Name: {u.name || 'N/A'}</Text>
+                      <Text variant="caption" color={themeColors.textSecondary}>Email: {u.email || 'N/A'}</Text>
+                      <Text variant="caption" color={themeColors.textSecondary}>ID: {u.id}</Text>
+                      <Text variant="caption" color={themeColors.primary}>Points: {u.points || 0}</Text>
+                    </Card>
+                  ))
+                ) : (
+                  <Text variant="caption" color={themeColors.textSecondary} style={{ marginBottom: Spacing.md }}>No user records in local SQLite.</Text>
+                )}
+
+                {/* BOOKINGS TABLE */}
+                <View style={styles.tableHeaderRow}>
+                  <Text variant="h3">🎟️ Table: bookings ({dbData?.bookings.length || 0})</Text>
+                </View>
+                {dbData?.bookings && dbData.bookings.length > 0 ? (
+                  dbData.bookings.map((b, idx) => (
+                    <Card key={b.id || idx} style={styles.dbRowCard}>
+                      <Text variant="body" weight="bold">ID: {b.id}</Text>
+                      <Text variant="caption" color={themeColors.textSecondary}>Venue ID: {b.venueId}</Text>
+                      <Text variant="caption">Date: {b.date} | Time: {b.timeSlot}</Text>
+                      <Text variant="caption" weight="bold" color={b.status === 'Cancelled' ? themeColors.error : themeColors.success}>
+                        Amount: ₹{b.amount} | Status: {b.status}
+                      </Text>
+                    </Card>
+                  ))
+                ) : (
+                  <Text variant="caption" color={themeColors.textSecondary} style={{ marginBottom: Spacing.md }}>No bookings in local SQLite.</Text>
+                )}
+
+                {/* SUMMARY STATS */}
+                <View style={styles.tableHeaderRow}>
+                  <Text variant="h3">📊 Cached Datasets</Text>
+                </View>
+                <Card style={styles.dbRowCard}>
+                  <Text variant="body">Saved Favorites: {dbData?.favorites.length || 0}</Text>
+                  <Text variant="body">Cached Venues: {dbData?.venuesCount || 0}</Text>
+                </Card>
+              </ScrollView>
+            )}
+
+            <Button 
+              title="Close Database Inspector" 
+              variant="outline" 
+              onPress={() => setShowDbModal(false)}
+              style={{ marginTop: Spacing.md }} 
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -235,6 +346,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: Spacing.md,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    height: '80%',
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+    paddingBottom: Spacing.sm,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  tableHeaderRow: {
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  dbRowCard: {
+    marginBottom: Spacing.sm,
     padding: Spacing.md,
   }
 });

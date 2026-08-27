@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { User, Booking, Notification, Venue, Sport } from '../types';
+import { Booking, Sport, User, Venue } from '../types';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
@@ -135,6 +135,25 @@ export async function getLocalUser(userId: string): Promise<User | null> {
   } catch (error) {
     console.error('[SQLite] Error reading user:', error);
     return null;
+  }
+}
+
+export async function getAllLocalUsers(): Promise<User[]> {
+  try {
+    const db = await getLocalDb();
+    const rows = await db.getAllAsync<any>(`SELECT * FROM users;`);
+    if (!rows || rows.length === 0) return [];
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name || 'TurfMate User',
+      email: row.email || '',
+      phone: row.phone || '',
+      isVerified: Boolean(row.isVerified),
+      points: row.points || 0
+    }));
+  } catch (error) {
+    console.error('[SQLite] Error reading all users:', error);
+    return [];
   }
 }
 
@@ -297,5 +316,32 @@ export async function getLocalFavorites(userId: string): Promise<string[]> {
   } catch (error) {
     console.error('[SQLite] Error getting local favorites:', error);
     return [];
+  }
+}
+
+/**
+ * Returns raw database tables for in-app Database Inspector
+ */
+export async function getRawDatabaseDump(): Promise<{
+  users: any[];
+  bookings: any[];
+  favorites: any[];
+  venuesCount: number;
+}> {
+  try {
+    const db = await getLocalDb();
+    const users = await db.getAllAsync<any>('SELECT * FROM users;');
+    const bookings = await db.getAllAsync<any>('SELECT * FROM bookings;');
+    const favorites = await db.getAllAsync<any>('SELECT * FROM favorites;');
+    const venues = await db.getAllAsync<any>('SELECT id FROM venues;');
+    return {
+      users: users || [],
+      bookings: bookings || [],
+      favorites: favorites || [],
+      venuesCount: venues ? venues.length : 0
+    };
+  } catch (error) {
+    console.error('[SQLite] Error reading database dump:', error);
+    return { users: [], bookings: [], favorites: [], venuesCount: 0 };
   }
 }
