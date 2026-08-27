@@ -74,7 +74,7 @@ export default function RegisterScreen() {
       });
       // Auth state listener in AppContext will catch auth state change & navigate
     } catch (err: unknown) {
-      console.error('Firebase Auth Error:', err);
+      console.warn('Firebase Registration Issue:', err);
       setError(getFirebaseAuthErrorMessage(err));
     } finally {
       setLoading(false);
@@ -154,6 +154,20 @@ export default function RegisterScreen() {
               disabled={loading}
             />
 
+            <View style={styles.divider}>
+              <View style={[styles.line, { backgroundColor: themeColors.border }]} />
+              <Text variant="caption" style={{ paddingHorizontal: Spacing.sm }}>OR</Text>
+              <View style={[styles.line, { backgroundColor: themeColors.border }]} />
+            </View>
+
+            <Button 
+              title="Continue as Guest" 
+              variant="outline"
+              onPress={() => login(true)} 
+              style={styles.guestButton}
+              disabled={loading}
+            />
+
             <View style={styles.loginContainer}>
               <Text variant="body" color={themeColors.textSecondary}>Already have an account? </Text>
               <Link href="/(auth)/login" asChild>
@@ -190,6 +204,18 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     marginTop: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+  },
+  guestButton: {
     marginBottom: Spacing.xl,
   },
   loginContainer: {

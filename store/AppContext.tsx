@@ -7,7 +7,7 @@ import { logoutUser } from '../services/authService';
 import { getUserProfile } from '../services/userService';
 
 import { initializeAndSyncData, saveBookingDual } from '../services/syncService';
-import { saveLocalFavorite, removeLocalFavorite, getLocalFavorites } from '../database/localDatabase';
+import { saveLocalFavorite, removeLocalFavorite, getLocalFavorites, saveLocalUser } from '../database/localDatabase';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -85,6 +85,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             points: profile?.rewardPoints ?? 0,
           };
           setUser(u);
+          await saveLocalUser(u);
 
           try {
             const favs = await getLocalFavorites(u.id);
@@ -93,14 +94,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             console.error('Error fetching local favorites:', e);
           }
         } catch {
-          setUser({
+          const fallbackUser: User = {
             id: fbUser.uid,
             name: fbUser.displayName || 'TurfMate User',
             email: fbUser.email || '',
             phone: fbUser.phoneNumber || '',
             isVerified: fbUser.emailVerified || false,
             points: 0,
-          });
+          };
+          setUser(fallbackUser);
+          await saveLocalUser(fallbackUser);
         }
       } else {
         setUser(null);
